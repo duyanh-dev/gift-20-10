@@ -190,7 +190,7 @@ function hitMesh(geo, kind, idx=0){
 /* LED: mỗi đèn một vật liệu riêng để sáng độc lập */
 const ledGeo = {};
 function makeLED(r=.034, geo){
-  const mat = new THREE.MeshStandardMaterial({ color:0x2b2c31, roughness:.45, metalness:.3, emissive:0xfff0d8, emissiveIntensity:0 });
+  const mat = new THREE.MeshStandardMaterial({ color:0x2b2c31, roughness:.45, metalness:.3, emissive:0x28f0a0, emissiveIntensity:0 });
   const g = geo || (ledGeo[r] = ledGeo[r] || GEO.led(r));
   const m = new THREE.Mesh(g, mat); m.rotation.x = Math.PI/2; m.userData.on = false; return m;
 }
@@ -198,7 +198,7 @@ function ledSet(l, on, pop=true){
   if(l.userData.on === on) return; l.userData.on = on;
   const m = l.material;
   gsap.to(m, { emissiveIntensity: on ? 2.6 : 0, duration:.22 });
-  gsap.to(m.color, { r: on?1:.17, g: on?1:.18, b: on?1:.19, duration:.22 });
+  gsap.to(m.color, { r: on?.16:.17, g: on?.94:.18, b: on?.63:.19, duration:.22 });
   if(on && pop && l.geometry.type === 'CylinderGeometry') gsap.fromTo(l.scale, { x:2, z:2 }, { x:1, z:1, duration:.55, ease:'back.out(3)' });
 }
 function ledRing(parent, count, radius, z, r){
@@ -282,7 +282,7 @@ const lidParts = {};
     return { s, dir };
   });
   /* cụm bánh răng ăn khớp trên nắp (2 hàng × 5 bánh) */
-  function gearGeo(N, rp, depth){
+  function gearGeo(N, rp, depth, holeR){
     const ro = rp + .012, ri = rp - .02, step = Math.PI*2/N, sh = new THREE.Shape();
     for(let i=0;i<N;i++){
       const a = i*step;
@@ -292,7 +292,7 @@ const lidParts = {};
       });
     }
     sh.closePath();
-    const hole = new THREE.Path(); hole.absarc(0,0,rp*.28,0,Math.PI*2,true); sh.holes.push(hole);
+    const hole = new THREE.Path(); hole.absarc(0,0,holeR || rp*.28,0,Math.PI*2,true); sh.holes.push(hole);
     const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled:true, bevelThickness:.002, bevelSize:.002, bevelSegments:1, curveSegments:14 });
     g.rotateX(-Math.PI/2); return g;
   }
@@ -304,6 +304,24 @@ const lidParts = {};
     const pin = new THREE.Mesh(new THREE.CylinderGeometry(GR[i]*.16,GR[i]*.16,.05,16), M.dark); pin.position.set(xx,.085,zz); lid.add(pin);
     lidParts.gears.push({ m, dir: i%2 ? -1 : 1, ratio: 15/N, phi: GP[i] });
   }));
+  /* bánh răng vành lớn quanh đĩa — ăn khớp với cụm bánh răng, quay ngược chiều */
+  {
+    const rg = new THREE.Mesh(gearGeo(72, .58, .03, .5), M.rib); rg.position.set(0,.071,0); lid.add(rg);
+    lidParts.gears.push({ m:rg, dir:-1, ratio:.3, phi:0 });
+  }
+  /* 2 cột đèn LED chạy dọc hai bên nắp */
+  lidParts.leds = [];
+  [-.7,.7].forEach((xx,c) => { for(let i=0;i<9;i++){
+    const l = makeLED(.026); l.rotation.x = 0; l.position.set(xx,.077, c ? .5-i*.125 : -.5+i*.125); lid.add(l); lidParts.leds.push(l);
+  } });
+  /* 4 càng kẹp ở góc nắp — xoay bật ra trước khi nâng */
+  lidParts.clamps = [[1,1],[-1,1],[1,-1],[-1,-1]].map(([a,b]) => {
+    const g = new THREE.Group(); g.position.set(a*.84,.078,b*.84); lid.add(g);
+    const arm = new THREE.Mesh(new RoundedBoxGeometry(.22,.05,.1,2,.015), M.metal); arm.position.set(-a*.09,.025,0); g.add(arm);
+    const pv = new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.07,20), M.rib); pv.position.y = .035; g.add(pv);
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.01,12), M.dark); bolt.position.y = .074; g.add(bolt);
+    return { g, a, b, x:g.position.x, z:g.position.z };
+  });
   lidParts.lid = lid; lidParts.disc = disc; lidParts.ring = ring; lidParts.dot = dot;
 }
 
@@ -350,7 +368,7 @@ const MECH = {};
   [.17,-.17].forEach(y => { const r = new THREE.Mesh(new THREE.BoxGeometry(1.66,.025,.03), M.metal); r.position.set(0,y,.035); f.add(r); });
   const segs = [];
   for(let i=0;i<10;i++){
-    const m = new THREE.MeshStandardMaterial({ color:0x2b2c31, roughness:.45, metalness:.3, emissive:0xfff0d8, emissiveIntensity:0 });
+    const m = new THREE.MeshStandardMaterial({ color:0x2b2c31, roughness:.45, metalness:.3, emissive:0x28f0a0, emissiveIntensity:0 });
     const s = new THREE.Mesh(new THREE.BoxGeometry(.1,.05,.02), m); s.position.set(-.64 + i*(1.28/9), 0, .05); s.userData.on = false; f.add(s); segs.push(s);
   }
   const knob = new THREE.Group(); knob.position.set(-.64,0,.045); f.add(knob);
@@ -403,7 +421,7 @@ const MECH = {};
    hệ toạ độ cục bộ của kf trùng với hệ toạ độ màn hình.
    ════════════════════════════════════════════════ */
 const KEY = { code:CONFIG.code, buf:'', locked:false, done:false, tok:0, keys:[], digits:[], bar:null, bolts:[] };
-const LIT  = { w:new THREE.Color(0xff2e45), g:new THREE.Color(0x7dffb8), r:new THREE.Color(0xff4d5e) };
+const LIT  = { w:new THREE.Color(0xff1f3a), g:new THREE.Color(0x7dffb8), r:new THREE.Color(0xff4d5e), o:new THREE.Color(0x00d43a) };
 const OFFC = new THREE.Color(.07,.07,.08);
 const SEGMASK = {
   '0':'abcdef','1':'bc','2':'abdeg','3':'abcdg','4':'bcfg','5':'acdfg','6':'acdefg','7':'abc','8':'abcdefg','9':'abcdfg',
@@ -427,7 +445,7 @@ const kLight = new THREE.PointLight(0xfff0e0, 0, 6, 1.5); kLight.position.set(0,
 
   /* bảng điện tử: viền kim loại nổi + kính tối + 4 chữ số 7 đoạn đùn khối */
   const bezel = new THREE.Mesh(new RoundedBoxGeometry(1.5,.5,.09,3,.05), M.metal); bezel.position.set(0,.64,.075); kf.add(bezel);
-  const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(1.36,.36), new THREE.MeshStandardMaterial({ color:0x050607, roughness:.12, metalness:.4 }));
+  const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(1.36,.36), new THREE.MeshBasicMaterial({ color:0x050507 }));
   glassPane.position.set(0,.64,.1205); kf.add(glassPane);
 
   function segGeo(len, th, depth){
@@ -436,15 +454,15 @@ const kLight = new THREE.PointLight(0xfff0e0, 0, 6, 1.5); kLight.position.set(0,
     const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled:true, bevelThickness:.004, bevelSize:.004, bevelSegments:1, curveSegments:1 });
     g.translate(0,0,-depth/2); return g;
   }
-  const gH = segGeo(.118,.028,.03), gV = segGeo(.112,.028,.03);
-  const w = .15, h = .26;
+  const gH = segGeo(.15,.042,.03), gV = segGeo(.14,.042,.03);
+  const w = .19, h = .29;
   const SPOS = { a:[0,h/2,0], b:[w/2,h/4,1], c:[w/2,-h/4,1], d:[0,-h/2,0], e:[-w/2,-h/4,1], f:[-w/2,h/4,1], g:[0,0,0] };
   [-.45,-.15,.15,.45].forEach(cx => {
     const g = new THREE.Group(); g.position.set(cx,.64,.128); kf.add(g);
     const segs = {};
     Object.keys(SPOS).forEach(k => {
       const [x,y,vert] = SPOS[k];
-      const mat = new THREE.MeshStandardMaterial({ color:0x121214, roughness:.4, metalness:.3, emissive:0xfff0d8, emissiveIntensity:0 });
+      const mat = new THREE.MeshStandardMaterial({ color:0x121214, roughness:.4, metalness:.3, emissive:0xfff0d8, emissiveIntensity:0, toneMapped:false });
       const m = new THREE.Mesh(vert ? gV : gH, mat); m.position.set(x,y,0); if(vert) m.rotation.z = Math.PI/2; g.add(m); segs[k] = m;
     });
     KEY.digits.push({ g, segs });
@@ -495,7 +513,7 @@ function paintDigit(i, ch, tone='w', level=2.6){
   Object.keys(D.segs).forEach(k => {
     const m = D.segs[k].material, on = mask.includes(k), c = on ? LIT[tone] : OFFC;
     m.emissive.copy(LIT[tone]);
-    gsap.to(m, { emissiveIntensity: on ? level : 0, duration:.18, overwrite:true });
+    gsap.to(m, { emissiveIntensity: on ? level*.3 : 0, duration:.18, overwrite:true });
     gsap.to(m.color, { r:c.r, g:c.g, b:c.b, duration:.18, overwrite:true });
   });
 }
@@ -503,7 +521,7 @@ function showWord(word, tone='w', level=3){ for(let i=0;i<4;i++) paintDigit(i, w
 function refreshDisplay(pop){
   for(let i=0;i<4;i++){
     const ch = KEY.buf[i];
-    if(ch) paintDigit(i, ch, 'w', 3.4); else paintDigit(i, '-', 'w', .12);
+    if(ch) paintDigit(i, ch, 'w', 3.4); else paintDigit(i, '-', 'w', .5);
   }
   if(pop && KEY.buf.length){
     const D = KEY.digits[KEY.buf.length-1];
@@ -537,7 +555,7 @@ const paper = new THREE.Mesh(new THREE.PlaneGeometry(LW,LH), M.paper); letter.ad
 }
 
 /* ── ảnh instax + phong bì trên mặt đáy hộp ───── */
-const LT = { e:0 }, ENV = { x:.56, z:0 };
+const LT = { e:0, o:0 }, ENV = { x:.56, z:0 }, LS = { x:0, y:.5, z:.2 };
 const items = new THREE.Group(); items.position.y = -.925; items.visible = false; cube.add(items);
 const photoCv = [];
 function photoCanvas(i){
@@ -570,20 +588,84 @@ function photoCanvas(i){
   m.rotation.x = -Math.PI/2; m.raycast = () => {}; g.add(m);
   const h = hitMesh(new THREE.PlaneGeometry(.38,.6), 'photo', i); h.rotation.x = -Math.PI/2; h.position.y = .01; g.add(h);
 });
+
+/* ── phong bì: thân vẽ bằng canvas (lớp lót hoa + túi trước + viền thư hàng không + tem), nắp tam giác có đường chỉ, dấu sáp đỏ hình tim ── */
 const env = new THREE.Group(); env.position.set(ENV.x,.006,ENV.z); env.rotation.y = -.12; items.add(env);
 const eg = new THREE.Group(); eg.rotation.x = -Math.PI/2; env.add(eg);
-{
-  const c = document.createElement('canvas'); c.width = 500; c.height = 340; const x = c.getContext('2d');
-  x.fillStyle = '#fff3f6'; x.fillRect(0,0,500,340); x.strokeStyle = '#f0a3bb'; x.lineWidth = 5; x.lineJoin = 'round';
-  x.strokeRect(2,2,496,336); x.beginPath(); x.moveTo(0,340); x.lineTo(250,160); x.lineTo(500,340); x.stroke();
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const eb = new THREE.Mesh(new THREE.PlaneGeometry(.5,.34), new THREE.MeshBasicMaterial({ map:t, toneMapped:false })); eb.raycast = () => {}; eg.add(eb);
-}
 const flapHinge = new THREE.Group(); flapHinge.position.set(0,.17,.002); eg.add(flapHinge);
 {
-  const fs = new THREE.Shape(); fs.moveTo(-.25,0); fs.lineTo(.25,0); fs.lineTo(0,-.2); fs.closePath();
-  const flap = new THREE.Mesh(new THREE.ShapeGeometry(fs), new THREE.MeshBasicMaterial({ color:0xf5b3c7, side:THREE.DoubleSide, toneMapped:false })); flap.raycast = () => {}; flapHinge.add(flap);
-  const seal = new THREE.Mesh(new THREE.CircleGeometry(.032,24), new THREE.MeshBasicMaterial({ color:0xe5334f, toneMapped:false })); seal.position.set(0,-.17,.002); seal.raycast = () => {}; flap.add(seal);
+  const CW = 1000, CH = 680;
+  const bc = document.createElement('canvas'); bc.width = CW; bc.height = CH; const x = bc.getContext('2d');
+  const bt = new THREE.CanvasTexture(bc); bt.colorSpace = THREE.SRGBColorSpace; bt.anisotropy = 4;
+  /* hoạ tiết sọc chéo hồng–xanh cho viền */
+  const pc = document.createElement('canvas'); pc.width = pc.height = 40; const px = pc.getContext('2d');
+  px.fillStyle = '#fffafb'; px.fillRect(0,0,40,40);
+  const band = (off, col) => { px.fillStyle = col; [0,-40].forEach(s => { px.beginPath(); px.moveTo(off+s,0); px.lineTo(off+s+14,0); px.lineTo(off+s+54,40); px.lineTo(off+s+40,40); px.closePath(); px.fill(); }); };
+  band(0,'#f0678b'); band(20,'#79aef2');
+  const drawEnv = () => {
+    x.clearRect(0,0,CW,CH);
+    /* lớp lót bên trong (thấy khi mở nắp) */
+    let g = x.createLinearGradient(0,0,0,CH); g.addColorStop(0,'#f2a2bc'); g.addColorStop(1,'#f7bfd0');
+    x.fillStyle = g; x.fillRect(0,0,CW,CH);
+    x.fillStyle = 'rgba(255,255,255,.34)';
+    for(let r=0;r<9;r++) for(let c=0;c<16;c++){ x.beginPath(); x.arc(c*64 + (r%2?32:0), r*46+20, 6, 0, 7); x.fill(); }
+    g = x.createLinearGradient(0,0,0,330); g.addColorStop(0,'rgba(110,20,60,.34)'); g.addColorStop(1,'rgba(110,20,60,0)');
+    x.fillStyle = g; x.fillRect(0,0,CW,330);
+    /* túi phía trước (có bóng đổ lên lớp lót) */
+    x.save(); x.shadowColor = 'rgba(110,25,60,.42)'; x.shadowBlur = 26; x.shadowOffsetY = -8;
+    g = x.createLinearGradient(0,0,0,CH); g.addColorStop(0,'#ffeef3'); g.addColorStop(1,'#ffd3e0');
+    x.fillStyle = g; x.beginPath(); x.moveTo(0,0); x.lineTo(500,340); x.lineTo(1000,0); x.lineTo(1000,CH); x.lineTo(0,CH); x.closePath(); x.fill(); x.restore();
+    /* đường gấp */
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    [['rgba(200,90,130,.38)',3,0],['rgba(255,255,255,.85)',2.5,3]].forEach(([col,lw,o]) => {
+      x.strokeStyle = col; x.lineWidth = lw;
+      x.beginPath(); x.moveTo(0,CH-o); x.lineTo(500,340+o); x.lineTo(1000,CH-o); x.stroke();
+      x.beginPath(); x.moveTo(0,0+o); x.lineTo(500,340+o); x.lineTo(1000,0+o); x.stroke();
+    });
+    /* tem + chữ viết tay */
+    x.save(); x.translate(808,470); x.rotate(.06);
+    x.fillStyle = '#fffdfb'; x.shadowColor = 'rgba(120,40,70,.3)'; x.shadowBlur = 10; x.shadowOffsetY = 3; x.fillRect(0,0,132,156); x.shadowColor = 'transparent';
+    x.setLineDash([7,6]); x.strokeStyle = '#e48aa7'; x.lineWidth = 3; x.strokeRect(8,8,116,140); x.setLineDash([]);
+    x.fillStyle = '#e5334f'; x.beginPath(); x.moveTo(66,112); x.bezierCurveTo(24,84,34,40,66,62); x.bezierCurveTo(98,40,108,84,66,112); x.fill(); x.restore();
+    x.fillStyle = '#b5476a'; x.font = '70px "Patrick Hand", cursive'; x.textAlign = 'left'; x.fillText('Gửi em', 86, 600);
+    x.fillStyle = 'rgba(181,71,106,.28)'; x.fillRect(86,628,300,3);
+    /* viền thư hàng không */
+    x.strokeStyle = x.createPattern(pc,'repeat'); x.lineWidth = 26; x.strokeRect(13,13,CW-26,CH-26);
+    x.strokeStyle = 'rgba(150,50,90,.25)'; x.lineWidth = 2; x.strokeRect(1,1,CW-2,CH-2);
+    bt.needsUpdate = true;
+  };
+  drawEnv(); if(document.fonts) document.fonts.ready.then(drawEnv);
+  /* bóng dưới phong bì */
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(.58,.42), new THREE.MeshBasicMaterial({ color:0x4a1c30, transparent:true, opacity:.24, depthWrite:false }));
+  sh.position.set(.014,-.018,-.003); sh.raycast = () => {}; eg.add(sh);
+  const eb = new THREE.Mesh(new THREE.PlaneGeometry(.5,.34), new THREE.MeshBasicMaterial({ map:bt, toneMapped:false })); eb.raycast = () => {}; eg.add(eb);
+
+  /* nắp tam giác */
+  const fc = document.createElement('canvas'); fc.width = 1000; fc.height = 340; const fx = fc.getContext('2d');
+  let fg = fx.createLinearGradient(0,0,0,340); fg.addColorStop(0,'#ffc9da'); fg.addColorStop(1,'#f08fb0');
+  fx.fillStyle = fg; fx.fillRect(0,0,1000,340);
+  fx.fillStyle = 'rgba(255,255,255,.18)'; fx.beginPath(); fx.moveTo(0,0); fx.lineTo(1000,0); fx.lineTo(500,170); fx.closePath(); fx.fill();
+  fx.setLineDash([16,11]); fx.strokeStyle = 'rgba(255,255,255,.8)'; fx.lineWidth = 4; fx.lineCap = 'round';
+  fx.beginPath(); fx.moveTo(70,34); fx.lineTo(930,34); fx.lineTo(500,284); fx.closePath(); fx.stroke();
+  fx.setLineDash([]); fx.strokeStyle = 'rgba(160,50,95,.35)'; fx.lineWidth = 3; fx.beginPath(); fx.moveTo(0,0); fx.lineTo(500,340); fx.lineTo(1000,0); fx.stroke();
+  const ft = new THREE.CanvasTexture(fc); ft.colorSpace = THREE.SRGBColorSpace; ft.anisotropy = 4;
+  const fgeo = new THREE.BufferGeometry();
+  fgeo.setAttribute('position', new THREE.Float32BufferAttribute([-.25,0,0,.25,0,0,0,-.17,0],3));
+  fgeo.setAttribute('uv', new THREE.Float32BufferAttribute([0,1,1,1,.5,0],2));
+  const flap = new THREE.Mesh(fgeo, new THREE.MeshBasicMaterial({ map:ft, side:THREE.DoubleSide, toneMapped:false })); flap.raycast = () => {}; flapHinge.add(flap);
+
+  /* dấu sáp hình tim */
+  const sc = document.createElement('canvas'); sc.width = sc.height = 192; const sx = sc.getContext('2d');
+  sx.translate(96,96); sx.beginPath();
+  for(let i=0;i<=64;i++){ const a = i/64*Math.PI*2, r = 80 + Math.sin(a*7)*3 + Math.sin(a*3+1)*2.5; i ? sx.lineTo(Math.cos(a)*r, Math.sin(a)*r) : sx.moveTo(Math.cos(a)*r, Math.sin(a)*r); }
+  sx.closePath(); let sg = sx.createRadialGradient(-26,-30,8,0,0,90); sg.addColorStop(0,'#ff6b83'); sg.addColorStop(.55,'#d8243f'); sg.addColorStop(1,'#8e1228');
+  sx.shadowColor = 'rgba(60,0,15,.45)'; sx.shadowBlur = 14; sx.shadowOffsetY = 5; sx.fillStyle = sg; sx.fill(); sx.shadowColor = 'transparent';
+  sx.strokeStyle = 'rgba(255,170,185,.55)'; sx.lineWidth = 3; sx.beginPath(); sx.arc(0,0,60,0,7); sx.stroke();
+  sx.beginPath(); sx.moveTo(0,36); sx.bezierCurveTo(-46,6,-34,-34,0,-12); sx.bezierCurveTo(34,-34,46,6,0,36);
+  sx.fillStyle = '#b01a33'; sx.fill(); sx.lineWidth = 3; sx.strokeStyle = 'rgba(255,190,200,.7)'; sx.stroke();
+  const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
+  const seal = new THREE.Mesh(new THREE.PlaneGeometry(.085,.085), new THREE.MeshBasicMaterial({ map:st, transparent:true, toneMapped:false, depthWrite:false }));
+  seal.position.set(0,-.14,.002); seal.raycast = () => {}; flap.add(seal);
   const eh = hitMesh(new THREE.PlaneGeometry(.56,.4), 'env'); eh.position.z = .02; eg.add(eh);
 }
 
@@ -625,11 +707,47 @@ function updateSparks(dt){
 /* ════════════════════════════════════════════════
    TRẠNG THÁI
    ════════════════════════════════════════════════ */
-const S = { mode:'wait', stage:0, u:0, uT:0, rise:0, shk:0, lidM:0, lidB:0, zoom:0 };
+/* ── trái tim bay lên + quầng sáng hồng toả ra từ hộp (hiện khi hộp đã mở) ── */
+let hb = 0;
+const HN = 44, hPos = new Float32Array(HN*3), hX = new Float32Array(HN), hV = new Float32Array(HN), hP = new Float32Array(HN);
+for(let i=0;i<HN;i++){ hX[i] = (Math.random()*2-1)*2.4; hV[i] = .18 + Math.random()*.3; hP[i] = Math.random()*6.28; hPos[i*3] = hX[i]; hPos[i*3+1] = -1.8 + Math.random()*5.2; hPos[i*3+2] = (Math.random()*2-1)*1.4; }
+const heartTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32,28,2,32,32,30); g.addColorStop(0,'#ffd6e0'); g.addColorStop(1,'#ff5c86');
+  x.fillStyle = g; x.beginPath(); x.moveTo(32,56); x.bezierCurveTo(2,34,10,6,32,22); x.bezierCurveTo(54,6,62,34,32,56); x.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const hGeo = new THREE.BufferGeometry(); hGeo.setAttribute('position', new THREE.BufferAttribute(hPos,3));
+const hMat = new THREE.PointsMaterial({ map:heartTex, size:.17, sizeAttenuation:true, transparent:true, opacity:0, depthWrite:false });
+const hearts = new THREE.Points(hGeo, hMat); hearts.frustumCulled = false; hearts.raycast = () => {}; hearts.visible = false; scene.add(hearts);
+const glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  const g = x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.35,'rgba(255,170,200,.45)'); g.addColorStop(1,'rgba(255,120,170,0)');
+  x.fillStyle = g; x.fillRect(0,0,128,128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const gMat = new THREE.SpriteMaterial({ map:glowTex, color:0xffb8d0, transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending });
+const glowS = new THREE.Sprite(gMat); glowS.scale.set(3.4,3.4,1); glowS.position.set(0,.4,0); glowS.visible = false; glowS.raycast = () => {}; cube.add(glowS);
+function updateHearts(dt, time){
+  const a = smooth(S.rise);
+  hMat.opacity = a*(.55 + .35*Math.min(1,hb)); hearts.visible = a > .01;
+  gMat.opacity = a*(.3 + .1*Math.sin(time*1.8) + .35*Math.min(1,hb)); glowS.visible = a > .01;
+  hb *= Math.exp(-dt*.7);
+  if(a < .01) return;
+  const sp = 1 + hb*5;
+  for(let i=0;i<HN;i++){
+    hPos[i*3+1] += hV[i]*dt*sp;
+    if(hPos[i*3+1] > 3.4){ hPos[i*3+1] = -1.8; hX[i] = (Math.random()*2-1)*2.4; }
+    hPos[i*3] = hX[i] + Math.sin(time*.8 + hP[i])*.18;
+  }
+  hGeo.attributes.position.needsUpdate = true;
+}
+
+const S = { mode:'wait', stage:0, u:0, uT:0, rise:0, shk:0, lidM:0, lidB:0, zoom:0, zi:0 };
 const rot = { yaw:0, pitch:.12, tYaw:0, tPitch:.12, vYaw:0, vPitch:0, drag:false, idle:0 };
 const par = { x:0, y:0, tx:0, ty:0 };
 const tilt = { x:0, y:0 };
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+let ENVDONE = false, CLOSING = false;
 
 const toScreen = obj => { obj.getWorldPosition(_v); _v.project(camera); return { x:(_v.x*.5+.5)*W(), y:(-_v.y*.5+.5)*H() }; };
 function pxPerUnit(obj){
@@ -654,9 +772,9 @@ function applyOpen(u){
 /* ── camera ──────────────────────────────────── */
 function updateCamera(){
   const e = smooth(S.u), r = S.rise;
-  const dist = lerp(D0, D1, e) * (1 - .1*r - .07*S.zoom);
+  const dist = lerp(D0, D1, e) * (1 - .1*r - .07*S.zoom - .2*S.zi);
   const pitch = lerp(.1, .66, e) - .12*r;
-  const ty = lerp(0, .5, e) + .1*r;
+  const ty = lerp(0, .5, e) + .1*r - .12*S.zi;
   camera.position.set(par.x*.32, ty + Math.sin(pitch)*dist - par.y*.2, Math.cos(pitch)*dist);
   camera.lookAt(par.x*.08, ty, 0);
 }
@@ -665,11 +783,14 @@ function updateCamera(){
    CHỌN VẬT THỂ BẰNG TIA
    ════════════════════════════════════════════════ */
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+const inLetter = o => { while(o){ if(o === letter) return true; o = o.parent; } return false; };
 function pick(x, y){
   ndc.set(x/W()*2-1, -(y/H())*2+1); ray.setFromCamera(ndc, camera);
   /* bỏ qua vật đang ẩn (thư chưa ra, ảnh chưa hiện...) */
   const hits = ray.intersectObject(cube, true).filter(h => { let o = h.object; while(o){ if(!o.visible) return false; o = o.parent; } return true; });
   for(const h of hits){
+    /* thư đã tắt và đang nổi: không che ảnh / phong bì phía sau */
+    if(S.mode === 'items' && inLetter(h.object)) continue;
     if(h.object.userData.hit) return { kind:h.object.userData.hit, idx:h.object.userData.idx, obj:h.object };
     if(h.object.material && h.object.material.visible !== false) return null;
   }
@@ -679,12 +800,15 @@ function pick(x, y){
 /* ════════════════════════════════════════════════
    GỢI Ý BẰNG BÓNG TAY (không chữ)
    ════════════════════════════════════════════════ */
-const ghost = $('#ghost'); let ghostTl = null, hintTimer = 0;
+const ghost = $('#ghost'), swipe = $('#swipe'); let ghostTl = null, hintTimer = 0;
+const showSwipe = () => gsap.to(swipe, { autoAlpha:1, duration:.7, delay:.3 });
+const hideSwipe = () => gsap.to(swipe, { autoAlpha:0, duration:.25 });
 function hideGhost(){ if(ghostTl){ ghostTl.kill(); ghostTl = null; } gsap.killTweensOf(ghost); gsap.to(ghost,{ opacity:0, scale:1, duration:.2 }); }
 function armHint(ms=4500){ clearTimeout(hintTimer); hintTimer = setTimeout(playHint, ms); }
 function playHint(){
   hideGhost();
   if(!['play','unfold','letter','items'].includes(S.mode) || P) return;
+  if(S.mode === 'items' && ENVDONE) return;
   const tl = gsap.timeline({ repeat:-1, repeatDelay:.8 }); ghostTl = tl;
   const at = (x,y) => gsap.set(ghost,{ x, y });
   gsap.set(ghost,{ opacity:0, scale:1 });
@@ -726,9 +850,9 @@ function playHint(){
       .to(ghost,{ opacity:0, duration:.3 }, '+=.2');
   } else if(S.mode === 'unfold'){
     const c = toScreen(cube);
-    tl.call(() => at(c.x,c.y+30))
+    tl.call(() => at(c.x,c.y+50))
       .to(ghost,{ opacity:1, scale:.85, duration:.3 })
-      .to(ghost,{ y:c.y-Math.min(160,H()*.22), duration:1.3, ease:'power2.inOut' })
+      .to(ghost,{ y:c.y-Math.min(190,H()*.26), duration:1.2, ease:'power2.inOut' })
       .to(ghost,{ opacity:0, scale:1, duration:.3 });
   } else if(S.mode === 'letter'){
     const c = toScreen(letter);
@@ -849,7 +973,7 @@ function enterCode(){
   barTone('w', .5);
   /* bảng điện tử bật nguồn: từng ô sáng dần */
   for(let i=0;i<4;i++) gsap.delayedCall(.2 + i*.16, () => {
-    paintDigit(i, '-', 'w', .12); Snd.click(2600 + i*220, .16, 6, .03);
+    paintDigit(i, '-', 'w', .5); Snd.click(2600 + i*220, .16, 6, .03);
     gsap.fromTo(KEY.digits[i].g.position, { z:.2 }, { z:.128, duration:.45, ease:'back.out(2.5)' });
   });
   Snd.note(PENT[2], .1, 1.6); Snd.click(1300,.3,3,.08); haptic(10);
@@ -880,7 +1004,7 @@ function submit(){
   if(KEY.buf === KEY.code) codeOK(); else codeBad();
 }
 
-/* ĐÚNG: số xanh, sóng sáng lan trên phím, bảng hiện OPEn, bulông vặn ra, lật lên đỉnh, mở nắp cơ khí */
+/* ĐÚNG: số xanh, sóng sáng lan trên phím, bảng hiện OPEn (xanh lá đậm, nổi khối), bulông vặn ra, lật lên đỉnh, mở nắp cơ khí */
 function codeOK(){
   KEY.done = true; markPip(4); hideGhost(); clearTimeout(hintTimer);
   haptic([20,40,30,40,70]);
@@ -893,10 +1017,15 @@ function codeOK(){
     gsap.timeline({ delay:d }).to(k.cap.position, { z:.11, duration:.18, ease:'power2.out' }).to(k.cap.position, { z:.05, duration:.5, ease:'bounce.out' });
   });
   const wp = new THREE.Vector3(0,.64,.2); kf.localToWorld(wp); burst(wp, 60, 1.8, .2);
-  /* bảng đổi sang OPEn */
+  /* bảng đổi sang OPEn: xanh lá đậm, chữ nổi hẳn lên khỏi mặt kính */
   gsap.delayedCall(.9, () => {
-    showWord('OPEn', 'g', 3.4);
-    KEY.digits.forEach((D,i) => gsap.fromTo(D.g.position, { z:.2 }, { z:.128, duration:.5, delay:i*.06, ease:'back.out(2.5)' }));
+    showWord('OPEn', 'o', 8); barTone('o', 3);
+    kLight.color.setHex(0x9dffbd);
+    KEY.digits.forEach((D,i) => {
+      gsap.fromTo(D.g.position, { z:.2 }, { z:.178, duration:.5, delay:i*.06, ease:'back.out(2.5)' });
+      gsap.to(D.g.scale, { x:1.14, y:1.14, z:2.6, duration:.6, delay:i*.06, ease:'back.out(2)' });
+    });
+    const gp = new THREE.Vector3(0,.64,.25); kf.localToWorld(gp); burst(gp, 40, 1.2, .2);
     Snd.note(PENT[5]*2, .1, 1.8);
   });
   /* 4 bulông vặn ra, nổi lên */
@@ -932,16 +1061,21 @@ function codeBad(){
 }
 
 /* ════════════════════════════════════════════════
-   MỞ NẮP CƠ KHÍ — từ đỉnh hộp
-   vặn đĩa (bánh cóc) → chốt khoá thụt → trụ telescopic
-   nâng nắp, nắp vặn xoắn ốc → bản lề bật mở → ánh sáng
+   MỞ NẮP CƠ KHÍ — từ đỉnh hộp (nhiều bước, các bộ phận kéo nhau)
+   1  tháo 16 ốc vít ở 4 mặt bên
+   2  đèn LED chạy dọc nắp, đĩa trung tâm trồi lên và vặn,
+      bánh răng vành lớn + 2 hàng bánh răng ăn khớp quay theo đĩa
+   3  đĩa tiếp tục vặn → bánh răng kéo 4 chốt khoá thụt ra lần lượt
+   4  4 càng kẹp góc bật ra, đĩa hạ xuống khớp
+   5  hơi nén xì, 4 trụ telescopic nâng nắp xoắn ốc (bánh răng vẫn quay)
+   6  bản lề bật mở, nắp nảy lò xo, ánh sáng trào ra
    ════════════════════════════════════════════════ */
 function mechOpen(){
   S.mode = 'mech'; hideGhost(); clearTimeout(hintTimer);
-  const L = lidParts, o = .95, gearT = { v:0 };
-  const tl = gsap.timeline({ onComplete: () => { rot.idle = -.4; S.mode = 'unfold'; armHint(2400); } });
+  const L = lidParts, o = .9, gearT = { v:0 }, drive = () => setGears(gearT.v);
+  const tl = gsap.timeline({ onComplete: () => { rot.idle = -.4; S.mode = 'unfold'; showSwipe(); armHint(1200); } });
 
-  /* 0 — tháo 16 ốc vít ở 4 mặt bên (vặn ra, nhô lên) */
+  /* 1 — tháo 16 ốc vít ở 4 mặt bên (vặn ra, nhô lên) */
   tl.call(() => { Snd.ratchet(18, .95, 3100); haptic([6,20,6,20,6,20,6]); }, null, 0);
   SCREWS.forEach((s,i) => {
     const d = (i%4)*.05 + ((i/4)|0)*.05;
@@ -949,31 +1083,51 @@ function mechOpen(){
       .to(s.position, { z:.036, duration:.7, ease:'power2.out' }, d);
   });
 
-  /* 1 — vặn đĩa trung tâm, hai hàng bánh răng ăn khớp quay */
+  /* 2 — LED chạy, đĩa trồi lên và vặn, bánh răng quay theo */
+  L.leds.forEach((l,i) => tl.call(() => { ledSet(l, true); if(i%3 === 0) Snd.click(2300+i*40, .14, 6, .03); }, null, o-.1 + i*.07));
   tl.call(() => { Snd.ratchet(20, 1.2, 2300); haptic([8,30,8,30,8,30]); }, null, o)
-    .to(L.disc.rotation, { y:-Math.PI*2, duration:1.2, ease:'power2.inOut' }, o)
-    .to(gearT, { v:Math.PI*2.4, duration:1.5, ease:'power2.inOut', onUpdate:() => setGears(gearT.v) }, o-.1)
-    .fromTo(L.dot.scale, { x:1, z:1 }, { x:1.9, z:1.9, duration:.3, yoyo:true, repeat:1, ease:'power2.out', immediateRender:false }, o+.95);
+    .to(S, { zoom:.55, duration:1.6, ease:'power2.inOut' }, o)
+    .to(L.disc.position, { y:.17, duration:.55, ease:'power2.out' }, o)
+    .to(L.disc.rotation, { y:-Math.PI*2, duration:1.2, ease:'power2.inOut' }, o+.3)
+    .to(gearT, { v:Math.PI*2.4, duration:1.5, ease:'power2.inOut', onUpdate:drive }, o+.2)
+    .fromTo(L.dot.scale, { x:1, z:1 }, { x:1.9, z:1.9, duration:.3, yoyo:true, repeat:1, ease:'power2.out', immediateRender:false }, o+1.1);
 
-  /* 2 — 4 chốt khoá thụt ra ngoài, lần lượt */
-  L.latches.forEach((l,i) => {
-    const t = o+1.5+i*.1;
-    tl.to(l.s.position, { z:l.dir*.15, duration:.28, ease:'power3.out' }, t)
-      .call(() => { Snd.click(1500 + i*180, .4, 3, .06); haptic(12); }, null, t);
+  /* 3 — đĩa vặn tiếp, bánh răng kéo 4 chốt khoá thụt ra */
+  const p2 = o+1.7;
+  tl.call(() => { Snd.ratchet(16, 1.4, 2000); haptic([8,30,8,30,8,30]); }, null, p2)
+    .to(L.disc.rotation, { y:-Math.PI*4, duration:1.4, ease:'none' }, p2)
+    .to(gearT, { v:Math.PI*4.8, duration:1.4, ease:'none', onUpdate:() => {
+      drive();
+      const q = clamp(0,1,(gearT.v-Math.PI*2.4)/(Math.PI*2.4));
+      L.latches.forEach((l,i) => {
+        const qi = clamp(0,1,q*1.6 - i*.2);
+        l.s.position.z = l.dir*.15*smooth(qi);
+        if(qi > .5 && !l.f){ l.f = 1; Snd.click(1500+i*180,.4,3,.06); haptic(12); }
+      });
+    } }, p2);
+
+  /* 4 — càng kẹp ở góc bật ra, đĩa hạ xuống */
+  const ct = p2+1.5;
+  tl.call(() => { Snd.thump(.4); haptic([14,30,14]); }, null, ct)
+    .to(L.disc.position, { y:.08, duration:.4, ease:'power2.in' }, ct);
+  L.clamps.forEach((c,i) => {
+    tl.call(() => Snd.click(1100+i*160,.4,3,.08), null, ct+i*.1)
+      .to(c.g.rotation, { y:(c.a*c.b>0 ? -1 : 1)*Math.PI/2, duration:.45, ease:'power2.inOut' }, ct+i*.1)
+      .to(c.g.position, { x:c.x*1.12, z:c.z*1.12, duration:.45, ease:'power2.inOut' }, ct+i*.1);
   });
 
-  /* 3 — hơi nén xì ra, trụ telescopic nâng nắp xoắn ốc, camera đẩy gần */
-  const lt = o+2.2;
+  /* 5 — hơi nén xì ra, trụ telescopic nâng nắp xoắn ốc, bánh răng vẫn quay, camera đẩy gần */
+  const lt = ct+.8;
   tl.call(() => {
       Snd.servo(1.55, .12); haptic([10,20,10,20,10,20,40]);
       posts.forEach(p => { const w = new THREE.Vector3(); p.g.getWorldPosition(w); burst(w, 14, .7, .6); });
     }, null, lt)
     .to(S, { zoom:1, duration:1.55, ease:'power2.inOut' }, lt)
-    .to(lift, { v:.55, duration:1.55, ease:'power2.inOut', onUpdate:() => setLift(lift.v) }, lt)
+    .to(lift, { v:.55, duration:1.55, ease:'power2.inOut', onUpdate:() => { setLift(lift.v); setGears(Math.PI*4.8 + lift.v*10); L.disc.rotation.y = -Math.PI*4 - lift.v*7; } }, lt)
     .to(lidSlide.rotation, { y:-Math.PI*2, duration:1.55, ease:'power2.inOut' }, lt)
     .call(() => { lidSlide.rotation.y = 0; Snd.thump(.5); Snd.click(1200,.4,2,.1); haptic(18); }, null, lt+1.58);
 
-  /* 4 — bản lề bật mở, nắp nảy lò xo, trụ co lại, ánh sáng trào ra */
+  /* 6 — bản lề bật mở, nắp nảy lò xo, trụ co lại, ánh sáng trào ra */
   const ot = lt+1.65;
   tl.call(() => { Snd.whoosh(1.1,.2); Snd.servo(1.0,.07); }, null, ot)
     .to(S, { lidM:1, duration:1.25, ease:'power3.inOut' }, ot)
@@ -993,7 +1147,7 @@ function mechOpen(){
    BƯỚC 6 — kéo hộp bung ra (ảnh + phong bì hiện trên đáy hộp)
    ════════════════════════════════════════════════ */
 function finishUnfold(){
-  S.mode = 'rise'; hideGhost(); clearTimeout(hintTimer);
+  S.mode = 'rise'; hideGhost(); hideSwipe(); clearTimeout(hintTimer);
   Snd.whoosh(1.4,.26); haptic([20,40,30]);
   gsap.to(S, { u:1, duration:1, ease:'power3.out' });
   gsap.delayedCall(.9, () => {
@@ -1001,6 +1155,7 @@ function finishUnfold(){
     const p = new THREE.Vector3(0,.2,0); cube.localToWorld(p); burst(p, 90, 2.6, 1.2); haptic(30);
   });
   gsap.to(S, { rise:1, duration:2.4, delay:.7, ease:'expo.out' });
+  gsap.to(S, { zi:1, duration:2, delay:1.4, ease:'power2.inOut' });
   gsap.delayedCall(2.8, () => { S.mode = 'items'; markPip(5); armHint(2600); });
 }
 
@@ -1020,22 +1175,35 @@ pv.addEventListener('click', () => {
   gsap.to(pvc, { scale:.6, y:40, duration:.3, ease:'power2.in' });
   gsap.to(pv, { autoAlpha:0, duration:.3, onComplete:() => { S.mode = 'items'; armHint(3000); } });
 });
+/* phong bì bay lên, mở nắp, thư ló ra rồi trượt hẳn lên khỏi phong bì, phong bì chìm xuống */
 function openEnvelope(){
-  if(S.mode !== 'items') return; S.mode = 'envopen'; hideGhost(); clearTimeout(hintTimer);
-  haptic([10,30,14]); Snd.click(1300,.35,3,.07); Snd.note(PENT[2], .12, 1.8);
+  if(S.mode !== 'items' || CLOSING) return; S.mode = 'envopen'; ENVDONE = true; hideGhost(); clearTimeout(hintTimer);
+  haptic([10,30,14]); Snd.whoosh(.9,.18); Snd.click(1300,.35,3,.07); Snd.note(PENT[2], .12, 1.8);
+  cube.attach(env);
+  const wp = new THREE.Vector3();
   gsap.timeline({ onComplete:() => { S.mode = 'letter'; armHint(2200); } })
-    .to(flapHinge.rotation, { x:-Math.PI, duration:.8, ease:'power2.inOut' })
-    .call(() => {
-      letter.visible = true; Snd.whoosh(1,.16); Snd.note(PENT[4], .1, 2); haptic([12,30,18]);
-      const w = new THREE.Vector3(); env.getWorldPosition(w); burst(w, 24, 1.2, .5);
-    })
-    .to(LT, { e:1, duration:1.8, ease:'power3.inOut' });
+    .to(env.position, { x:0, y:.45, z:.4, duration:1.1, ease:'power3.inOut' }, 0)
+    .to(env.rotation, { x:Math.PI/2-.54, y:0, duration:1.1, ease:'power3.inOut' }, 0)
+    .to(env.scale, { x:1.7, y:1.7, z:1.7, duration:1.1, ease:'power3.inOut' }, 0)
+    .call(() => { Snd.click(1000,.4,2,.1); haptic(10); const w = new THREE.Vector3(); env.getWorldPosition(w); burst(w, 14, .8, .3); }, null, 1.2)
+    .to(flapHinge.rotation, { x:-Math.PI, duration:.9, ease:'back.out(1.3)' }, 1.3)
+    .call(() => { Snd.whoosh(.7,.12); Snd.note(PENT[3], .1, 1.6); letter.visible = true; }, null, 2.0)
+    /* 1) thư trồi nhẹ lên khỏi miệng phong bì, hơi lắc */
+    .to(LT, { o:1, duration:1.0, ease:'back.out(1.3)' }, 2.05)
+    .call(() => { haptic([8,24,8]); letter.getWorldPosition(wp); burst(wp, 18, .9, .7); }, null, 2.7)
+    /* 2) khựng lại một nhịp rồi bay vọt lên, phóng to, quay thẳng về phía người xem */
+    .call(() => { Snd.whoosh(1.1,.2); Snd.note(PENT[4], .1, 2); Snd.note(PENT[5], .08, 2.2, .1); haptic([12,30,18]); }, null, 3.35)
+    .to(LT, { e:1, duration:1.7, ease:'power3.inOut' }, 3.4)
+    .call(() => { letter.getWorldPosition(wp); burst(wp, 40, 1.6, .8); }, null, 4.3)
+    /* 3) phong bì trượt xuống và nhỏ dần */
+    .to(env.position, { y:-.2, duration:.9, ease:'power2.in' }, 3.6)
+    .to(env.scale, { x:.01, y:.01, z:.01, duration:.9, ease:'power2.in' }, 3.6);
 }
 
 /* ════════════════════════════════════════════════
-   BƯỚC 7 — kéo thư lên → thư biến thành kính
+   BƯỚC 7 — kéo thư lên → thư biến thành kính (có nút tắt để quay lại xem ảnh)
    ════════════════════════════════════════════════ */
-const letterEl = $('#letter'), pagesWrap = $('#pages');
+const letterEl = $('#letter'), pagesWrap = $('#pages'), xl = $('#xl'), rl = $('#rl');
 const pagesEl = CONFIG.pages.map(p => {
   const el = document.createElement('div'); el.className = 'pg'; const parts = [];
   if(p.title){ const h = document.createElement('h2'); h.textContent = p.title; parts.push(h); }
@@ -1069,20 +1237,61 @@ function letterRect(){
   const x = Math.min(...xs), y = Math.min(...ys);
   return { x, y, w:Math.max(...xs)-x, h:Math.max(...ys)-y };
 }
-function openLetter(){
-  if(S.mode !== 'letter') return; S.mode = 'opening'; hideGhost(); clearTimeout(hintTimer);
+function openLetter(again){
+  if(again ? S.mode !== 'items' : S.mode !== 'letter') return; S.mode = 'opening'; hideGhost(); clearTimeout(hintTimer);
+  letterEl.style.pointerEvents = '';
   haptic([12,30,18]); Snd.whoosh(.9,.2); Snd.note(PENT[3], .12, 2); Snd.note(PENT[5], .1, 2.2, .1);
-  markPip(6);
+  if(!again) markPip(6);
+  gsap.to(rl, { autoAlpha:0, duration:.25 });
   const r = letterRect(), fw = Math.min(W()*.88,500), fh = Math.min(H()*.7,620), fx = (W()-fw)/2, fy = (H()-fh)/2;
-  gsap.set(letterEl, { autoAlpha:1, margin:0, left:r.x, top:r.y, width:r.w, height:r.h, '--pa':.95, '--rad':'6px', transformPerspective:1100 });
+  gsap.set(letterEl, { autoAlpha:1, margin:0, left:r.x, top:r.y, width:r.w, height:r.h, '--pa':.95, '--rad':'6px', transformPerspective:1100, rotationX:0, rotationY:0 });
   letter.visible = false;
   gsap.timeline({ onComplete:() => { gsap.set(letterEl, { clearProps:'left,top,width,height,margin' }); S.mode = 'reading'; } })
     .to(dock, { autoAlpha:0, duration:.3 }, 0)
     .to(letterEl, { left:fx, top:fy, width:fw, height:fh, duration:1.25, ease:'expo.inOut' }, 0)
     .to(letterEl, { '--pa':.09, '--rad':'30px', duration:1, ease:'power2.inOut' }, .2)
-    .call(() => { dock.classList.remove('pips'); buildDots(CONFIG.pages.length); showPage(0,1); }, null, .95)
+    .call(() => { if(!again){ dock.classList.remove('pips'); buildDots(CONFIG.pages.length); if(cur === 0) cur = -1; showPage(0,1); } }, null, .95)
     .to(dock, { autoAlpha:1, duration:.7 }, 1.1);
 }
+
+/* tắt thư: thu về thành tờ giấy nổi trên hộp, để còn xem ảnh; có nút "Xem lại thư" để mở lại */
+function closeLetter(){
+  if(S.mode !== 'reading' || busy) return; S.mode = 'closing'; hideGhost();
+  P = null; rot.drag = false; letterEl.style.pointerEvents = 'none';
+  haptic(8); Snd.click(1000,.3,2,.08); Snd.note(PENT[1], .08, 1.4);
+  const r = letterRect(), fw = Math.min(W()*.88,500), fh = Math.min(H()*.7,620), fx = (W()-fw)/2, fy = (H()-fh)/2;
+  gsap.set(letterEl, { margin:0, left:fx, top:fy, width:fw, height:fh, rotationX:0, rotationY:0 });
+  gsap.timeline({ onComplete:() => { S.mode = 'items'; CLOSING = false; ENVDONE = false; armHint(2500); } })
+    .to(dock, { autoAlpha:0, duration:.25 }, 0)
+    .to(letterEl, { left:r.x, top:r.y, width:r.w, height:r.h, duration:.9, ease:'expo.inOut' }, 0)
+    .to(letterEl, { '--pa':.95, '--rad':'6px', duration:.7, ease:'power2.inOut' }, .1)
+    /* thư hiện lại ở chỗ vừa bay ra, phong bì nổi lên đón */
+    .call(() => {
+      letter.visible = true;
+      env.position.set(0,-.2,.4); env.rotation.set(Math.PI/2-.54,0,0); env.scale.setScalar(.01); flapHinge.rotation.x = -Math.PI;
+    }, null, .85)
+    .to(letterEl, { autoAlpha:0, duration:.15 }, .85)
+    .call(() => { gsap.set(letterEl, { clearProps:'left,top,width,height,margin' }); }, null, 1.1)
+    /* thư đã tắt: cho phép bấm ảnh ngay, không cần chờ thư về phong bì */
+    .call(() => { S.mode = 'items'; CLOSING = true; P = null; rot.drag = false; }, null, 1.15)
+    .to(env.position, { y:.45, duration:.7, ease:'power2.out' }, .9)
+    .to(env.scale, { x:1.7, y:1.7, z:1.7, duration:.7, ease:'power2.out' }, .9)
+    .call(() => { Snd.whoosh(.9,.14); Snd.note(PENT[2], .1, 1.6); }, null, 1.0)
+    /* thư bay ngược về, chui vào phong bì */
+    .to(LT, { e:0, duration:1.3, ease:'power3.inOut' }, 1.0)
+    .to(LT, { o:0, duration:.6, ease:'power2.in' }, 2.35)
+    .call(() => { Snd.click(1000,.3,2,.08); haptic(8); }, null, 2.9)
+    .call(() => { letter.visible = false; }, null, 2.95)
+    /* nắp đóng lại, phong bì về chỗ cũ trên đáy hộp */
+    .to(flapHinge.rotation, { x:0, duration:.7, ease:'power2.inOut' }, 2.95)
+    .call(() => { items.attach(env); Snd.whoosh(.7,.1); }, null, 3.65)
+    .to(env.position, { x:ENV.x, y:.006, z:ENV.z, duration:.9, ease:'power3.inOut' }, 3.65)
+    .to(env.rotation, { x:0, y:-.12, z:0, duration:.9, ease:'power3.inOut' }, 3.65)
+    .to(env.scale, { x:1, y:1, z:1, duration:.9, ease:'power3.inOut' }, 3.65);
+}
+['pointerdown','pointerup'].forEach(t => xl.addEventListener(t, e => e.stopPropagation()));
+xl.addEventListener('click', closeLetter);
+rl.addEventListener('click', () => openLetter(true));
 
 function showPage(n, dir=1){
   if(busy || n === cur) return; busy = true;
@@ -1099,7 +1308,7 @@ function showPage(n, dir=1){
   if(cur === pagesEl.length-1 && !finaleDone){ finaleDone = true; gsap.delayedCall(.5, finaleFx); }
 }
 function finaleFx(){
-  chord([0,2,4,5]); haptic([10,50,10,50,24]);
+  hb = 1; chord([0,2,4,5]); haptic([10,50,10,50,24]);
   const p = new THREE.Vector3(0,.8,0); cube.localToWorld(p); burst(p, 120, 3.2, 1.4);
 }
 const next = () => { if(S.mode !== 'reading' || busy || cur < 0 || cur >= pagesEl.length-1) return; showPage(cur+1, 1); };
@@ -1112,6 +1321,7 @@ addEventListener('keydown', e => {
   if(S.mode === 'code' && /^[0-9]$/.test(e.key)){ pressKeyIdx(KEYDEFS.indexOf(e.key)); return; }
   if(S.mode === 'code' && e.key === 'Backspace'){ pressKeyIdx(KEYDEFS.indexOf('C')); return; }
   if(S.mode === 'code' && e.key === 'Enter'){ e.preventDefault(); submit(); return; }
+  if(e.key === 'Escape'){ closeLetter(); return; }
   if(e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); next(); }
   if(e.key === 'ArrowLeft') prev();
 });
@@ -1147,6 +1357,7 @@ function moveRot(e){
 function endRot(){ rot.drag = false; rot.idle = 0; }
 
 canvas.addEventListener('pointerdown', e => {
+  if(P && performance.now() - P.t0 > 1500) P = null;
   if(P) return; e.preventDefault(); Snd.init(); askMotion(); hideGhost(); clearTimeout(hintTimer);
   const hit = (S.mode === 'play' || S.mode === 'letter' || S.mode === 'items' || S.mode === 'transition' || S.mode === 'code') ? pick(e.clientX, e.clientY) : null;
   P = { id:e.pointerId, x0:e.clientX, y0:e.clientY, t0:performance.now(), kind:'none', hit };
@@ -1167,7 +1378,7 @@ canvas.addEventListener('pointerdown', e => {
   } else if(S.mode === 'code'){
     if(hit && hit.kind === 'key'){ P.kind = 'key'; pressKeyIdx(hit.idx); }
     else { P.kind = 'rot'; startRot(e); }
-  } else if(S.mode === 'unfold'){ P.kind = 'pull'; }
+  } else if(S.mode === 'unfold'){ P.kind = 'pull'; hideSwipe(); }
   else if(S.mode === 'items'){
     if(hit && hit.kind === 'photo'){ P.kind = 'none'; showPhoto(hit.idx); }
     else if(hit && hit.kind === 'env'){ P.kind = 'none'; openEnvelope(); }
@@ -1208,6 +1419,7 @@ const release = e => {
     if(S.uT > .55) finishUnfold();
     else {
       gsap.to(S, { u:0, uT:0, duration:1, ease:'elastic.out(1,.55)' });
+      gsap.to(swipe, { autoAlpha:1, duration:.6, delay:1 });
       if(tap){ Snd.click(800,.25,2,.08); haptic(8); gsap.fromTo(S,{ u:.0 },{ u:.12, duration:.22, yoyo:true, repeat:1, ease:'power2.out', overwrite:true }); }
     }
   } else if(k === 'lift'){ if(tap) { P = null; openLetter(); return; } }
@@ -1236,6 +1448,10 @@ function askMotion(){
   else bindMotion();
 }
 document.addEventListener('gesturestart', e => e.preventDefault());
+/* tắt double-tap (zoom / chọn chữ / kích hoạt hai lần) */
+let lastTE = 0;
+document.addEventListener('touchend', e => { const n = Date.now(); if(n - lastTE < 350) e.preventDefault(); lastTE = n; }, { passive:false });
+document.addEventListener('dblclick', e => e.preventDefault());
 addEventListener('touchend', () => Snd.init(), { passive:true });
 addEventListener('click', () => Snd.init());
 
@@ -1270,7 +1486,7 @@ function frame(){
               bp = S.mode === 'unfold' ? 0 : S.mode === 'code' ? BOT : .12, k = 1-Math.exp(-dt*3.2);
         rot.tYaw += (by-rot.tYaw)*k; rot.tPitch += (bp-rot.tPitch)*k;
       }
-    } else if(S.mode === 'letter' || S.mode === 'items' || S.mode === 'envopen' || S.mode === 'photo' || S.mode === 'rise' || S.mode === 'opening' || S.mode === 'reading'){
+    } else if(S.mode === 'letter' || S.mode === 'items' || S.mode === 'envopen' || S.mode === 'photo' || S.mode === 'rise' || S.mode === 'opening' || S.mode === 'reading' || S.mode === 'closing'){
       rot.tPitch += (0-rot.tPitch)*(1-Math.exp(-dt*3));
     }
   }
@@ -1291,9 +1507,9 @@ function frame(){
     L.t += (L.target-L.t)*(1-Math.exp(-dt*22));
     L.knob.position.x = lerp(-.64,.64,L.t);
     const n = Math.floor(L.t*10 + .0001);
-    L.segs.forEach((s,i) => { const on = (i+.5)/10 <= L.t + .001; if(s.userData.on !== on){ s.userData.on = on; gsap.to(s.material,{ emissiveIntensity:on?2.6:0, duration:.2 }); gsap.to(s.material.color,{ r:on?1:.17, g:on?1:.18, b:on?1:.19, duration:.2 }); } });
+    L.segs.forEach((s,i) => { const on = (i+.5)/10 <= L.t + .001; if(s.userData.on !== on){ s.userData.on = on; gsap.to(s.material,{ emissiveIntensity:on?2.6:0, duration:.2 }); gsap.to(s.material.color,{ r:on?.16:.17, g:on?.94:.18, b:on?.63:.19, duration:.2 }); } });
     const tk = Math.floor(L.t*10); if(tk !== L.ticks){ L.ticks = tk; Snd.click(2000+tk*80,.2,5,.035); haptic(4); }
-    if(L.t >= .985){ L.done = true; L.held = false; L.t = 1; L.target = 1; gsap.to(L.knob.position,{ x:.64, duration:.15 }); L.segs.forEach(s => { s.userData.on = true; s.material.emissiveIntensity = 2.6; s.material.color.setRGB(1,1,1); }); stageDone(1); }
+    if(L.t >= .985){ L.done = true; L.held = false; L.t = 1; L.target = 1; gsap.to(L.knob.position,{ x:.64, duration:.15 }); L.segs.forEach(s => { s.userData.on = true; s.material.emissiveIntensity = 2.6; s.material.color.setRGB(.16,.94,.63); }); stageDone(1); }
   }
   /* orb */
   const O = MECH.orb;
@@ -1323,13 +1539,14 @@ function frame(){
     if(s.a < .02){ s.un = false; s.full = false; }
   });
 
-  /* thư: bay ra từ phong bì (LT.e) rồi nổi lên như cũ */
+  /* thư: ló ra khỏi phong bì (LT.o), bay lên (LT.e) rồi nổi lên như cũ */
   const rs = S.rise;
-  letter.position.y = lerp(-.8, lerp(-.32, 1.0, rs) + Math.sin(time*1.6)*.025*rs + (P && P.kind === 'lift' ? (P.lift||0)*.25 : 0), LT.e);
-  letter.position.x = lerp(ENV.x, 0, LT.e);
-  letter.position.z = lerp(ENV.z, lerp(0, .15, rs), LT.e);
+  letter.position.y = lerp(LS.y + LT.o*.4, lerp(-.32, 1.0, rs) + Math.sin(time*1.6)*.025*rs + (P && P.kind === 'lift' ? (P.lift||0)*.25 : 0), LT.e);
+  letter.position.x = lerp(LS.x, 0, LT.e);
+  letter.position.z = lerp(LS.z, lerp(0, .15, rs), LT.e);
   letter.rotation.x = -(lerp(.1,.66,smooth(S.u)) - .12*rs)*rs;
-  const ls = 1 + Math.sin(time*2.2)*.012*rs; letter.scale.setScalar(ls*lerp(1,1.22,rs)*lerp(.3,1,LT.e));
+  letter.rotation.z = Math.sin(time*5)*.028*LT.o*(1-LT.e);
+  const ls = 1 + Math.sin(time*2.2)*.012*rs; letter.scale.setScalar(ls*lerp(1,1.22,rs)*lerp(lerp(.3,.52,LT.o),1,LT.e));
 
   /* ảnh + phong bì hiện dần khi hộp bung ra */
   { const iu = smooth((S.u-.5)/.5); items.visible = iu > .01; items.scale.setScalar(Math.max(.001, iu)); }
@@ -1337,7 +1554,7 @@ function frame(){
   /* DOM nghiêng theo con trỏ */
   if(S.mode === 'reading' && !letterEl.dataset.fx) gsap.set(letterEl, { rotationY:par.x*5, rotationX:-par.y*4 });
 
-  updateCamera(); updateSparks(dt);
+  updateHearts(dt, time); updateCamera(); updateSparks(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
