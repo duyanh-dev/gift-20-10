@@ -875,12 +875,47 @@ function updateSparks(dt){
 /* ════════════════════════════════════════════════
    TRẠNG THÁI
    ════════════════════════════════════════════════ */
+/* ── trái tim bay lên + quầng sáng hồng toả ra từ hộp (hiện khi hộp đã mở) ── */
+let hb = 0;
+const HN = 44, hPos = new Float32Array(HN*3), hX = new Float32Array(HN), hV = new Float32Array(HN), hP = new Float32Array(HN);
+for(let i=0;i<HN;i++){ hX[i] = (Math.random()*2-1)*2.4; hV[i] = .18 + Math.random()*.3; hP[i] = Math.random()*6.28; hPos[i*3] = hX[i]; hPos[i*3+1] = -1.8 + Math.random()*5.2; hPos[i*3+2] = (Math.random()*2-1)*1.4; }
+const heartTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32,28,2,32,32,30); g.addColorStop(0,'#ffd6e0'); g.addColorStop(1,'#ff5c86');
+  x.fillStyle = g; x.beginPath(); x.moveTo(32,56); x.bezierCurveTo(2,34,10,6,32,22); x.bezierCurveTo(54,6,62,34,32,56); x.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const hGeo = new THREE.BufferGeometry(); hGeo.setAttribute('position', new THREE.BufferAttribute(hPos,3));
+const hMat = new THREE.PointsMaterial({ map:heartTex, size:.17, sizeAttenuation:true, transparent:true, opacity:0, depthWrite:false });
+const hearts = new THREE.Points(hGeo, hMat); hearts.frustumCulled = false; hearts.raycast = () => {}; hearts.visible = false; scene.add(hearts);
+const glowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  const g = x.createRadialGradient(64,64,0,64,64,64); g.addColorStop(0,'rgba(255,255,255,1)'); g.addColorStop(.35,'rgba(255,170,200,.45)'); g.addColorStop(1,'rgba(255,120,170,0)');
+  x.fillStyle = g; x.fillRect(0,0,128,128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const gMat = new THREE.SpriteMaterial({ map:glowTex, color:0xffb8d0, transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending });
+const glowS = new THREE.Sprite(gMat); glowS.scale.set(3.4,3.4,1); glowS.position.set(0,.4,0); glowS.visible = false; glowS.raycast = () => {}; cube.add(glowS);
+function updateHearts(dt, time){
+  const a = smooth(S.rise);
+  hMat.opacity = a*(.55 + .35*Math.min(1,hb)); hearts.visible = a > .01;
+  gMat.opacity = a*(.3 + .1*Math.sin(time*1.8) + .35*Math.min(1,hb)); glowS.visible = a > .01;
+  hb *= Math.exp(-dt*.7);
+  if(a < .01) return;
+  const sp = 1 + hb*5;
+  for(let i=0;i<HN;i++){
+    hPos[i*3+1] += hV[i]*dt*sp;
+    if(hPos[i*3+1] > 3.4){ hPos[i*3+1] = -1.8; hX[i] = (Math.random()*2-1)*2.4; }
+    hPos[i*3] = hX[i] + Math.sin(time*.8 + hP[i])*.18;
+  }
+  hGeo.attributes.position.needsUpdate = true;
+}
+
 const S = { mode:'wait', stage:0, u:0, uT:0, rise:0, shk:0, lidM:0, lidB:0, zoom:0, zi:0 };
 const rot = { yaw:0, pitch:.12, tYaw:0, tPitch:.12, vYaw:0, vPitch:0, drag:false, idle:0 };
 const par = { x:0, y:0, tx:0, ty:0 };
 const tilt = { x:0, y:0 };
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
-let ENVDONE = false;
+let ENVDONE = false, CLOSING = false;
 
 const toScreen = obj => { obj.getWorldPosition(_v); _v.project(camera); return { x:(_v.x*.5+.5)*W(), y:(-_v.y*.5+.5)*H() }; };
 function pxPerUnit(obj){
@@ -1310,7 +1345,7 @@ pv.addEventListener('click', () => {
 });
 /* phong bì bay lên, mở nắp, thư ló ra rồi trượt hẳn lên khỏi phong bì, phong bì chìm xuống */
 function openEnvelope(){
-  if(S.mode !== 'items') return; S.mode = 'envopen'; ENVDONE = true; hideGhost(); clearTimeout(hintTimer);
+  if(S.mode !== 'items' || CLOSING) return; S.mode = 'envopen'; ENVDONE = true; hideGhost(); clearTimeout(hintTimer);
   haptic([10,30,14]); Snd.whoosh(.9,.18); Snd.click(1300,.35,3,.07); Snd.note(PENT[2], .12, 1.8);
   cube.attach(env);
   const wp = new THREE.Vector3();
@@ -1372,6 +1407,7 @@ function letterRect(){
 }
 function openLetter(again){
   if(again ? S.mode !== 'items' : S.mode !== 'letter') return; S.mode = 'opening'; hideGhost(); clearTimeout(hintTimer);
+  letterEl.style.pointerEvents = '';
   haptic([12,30,18]); Snd.whoosh(.9,.2); Snd.note(PENT[3], .12, 2); Snd.note(PENT[5], .1, 2.2, .1);
   if(!again) markPip(6);
   gsap.to(rl, { autoAlpha:0, duration:.25 });
@@ -1389,10 +1425,11 @@ function openLetter(again){
 /* tắt thư: thu về thành tờ giấy nổi trên hộp, để còn xem ảnh; có nút "Xem lại thư" để mở lại */
 function closeLetter(){
   if(S.mode !== 'reading' || busy) return; S.mode = 'closing'; hideGhost();
+  P = null; rot.drag = false; letterEl.style.pointerEvents = 'none';
   haptic(8); Snd.click(1000,.3,2,.08); Snd.note(PENT[1], .08, 1.4);
   const r = letterRect(), fw = Math.min(W()*.88,500), fh = Math.min(H()*.7,620), fx = (W()-fw)/2, fy = (H()-fh)/2;
   gsap.set(letterEl, { margin:0, left:fx, top:fy, width:fw, height:fh, rotationX:0, rotationY:0 });
-  gsap.timeline({ onComplete:() => { S.mode = 'items'; ENVDONE = false; armHint(2500); } })
+  gsap.timeline({ onComplete:() => { S.mode = 'items'; CLOSING = false; ENVDONE = false; armHint(2500); } })
     .to(dock, { autoAlpha:0, duration:.25 }, 0)
     .to(letterEl, { left:r.x, top:r.y, width:r.w, height:r.h, duration:.9, ease:'expo.inOut' }, 0)
     .to(letterEl, { '--pa':.95, '--rad':'6px', duration:.7, ease:'power2.inOut' }, .1)
@@ -1403,6 +1440,8 @@ function closeLetter(){
     }, null, .85)
     .to(letterEl, { autoAlpha:0, duration:.15 }, .85)
     .call(() => { gsap.set(letterEl, { clearProps:'left,top,width,height,margin' }); }, null, 1.1)
+    /* thư đã tắt: cho phép bấm ảnh ngay, không cần chờ thư về phong bì */
+    .call(() => { S.mode = 'items'; CLOSING = true; P = null; rot.drag = false; }, null, 1.15)
     .to(env.position, { y:.45, duration:.7, ease:'power2.out' }, .9)
     .to(env.scale, { x:1.7, y:1.7, z:1.7, duration:.7, ease:'power2.out' }, .9)
     .call(() => { Snd.whoosh(.9,.14); Snd.note(PENT[2], .1, 1.6); }, null, 1.0)
@@ -1437,7 +1476,7 @@ function showPage(n, dir=1){
   if(cur === pagesEl.length-1 && !finaleDone){ finaleDone = true; gsap.delayedCall(.5, finaleFx); }
 }
 function finaleFx(){
-  chord([0,2,4,5]); haptic([10,50,10,50,24]);
+  hb = 1; chord([0,2,4,5]); haptic([10,50,10,50,24]);
   const p = new THREE.Vector3(0,.8,0); cube.localToWorld(p); burst(p, 120, 3.2, 1.4);
 }
 const next = () => { if(S.mode !== 'reading' || busy || cur < 0 || cur >= pagesEl.length-1) return; showPage(cur+1, 1); };
@@ -1486,6 +1525,7 @@ function moveRot(e){
 function endRot(){ rot.drag = false; rot.idle = 0; }
 
 canvas.addEventListener('pointerdown', e => {
+  if(P && performance.now() - P.t0 > 1500) P = null;
   if(P) return; e.preventDefault(); Snd.init(); askMotion(); hideGhost(); clearTimeout(hintTimer);
   const hit = (S.mode === 'play' || S.mode === 'letter' || S.mode === 'items' || S.mode === 'transition' || S.mode === 'code') ? pick(e.clientX, e.clientY) : null;
   P = { id:e.pointerId, x0:e.clientX, y0:e.clientY, t0:performance.now(), kind:'none', hit };
@@ -1576,6 +1616,10 @@ function askMotion(){
   else bindMotion();
 }
 document.addEventListener('gesturestart', e => e.preventDefault());
+/* tắt double-tap (zoom / chọn chữ / kích hoạt hai lần) */
+let lastTE = 0;
+document.addEventListener('touchend', e => { const n = Date.now(); if(n - lastTE < 350) e.preventDefault(); lastTE = n; }, { passive:false });
+document.addEventListener('dblclick', e => e.preventDefault());
 addEventListener('touchend', () => Snd.init(), { passive:true });
 addEventListener('click', () => Snd.init());
 
@@ -1678,7 +1722,7 @@ function frame(){
   /* DOM nghiêng theo con trỏ */
   if(S.mode === 'reading' && !letterEl.dataset.fx) gsap.set(letterEl, { rotationY:par.x*5, rotationX:-par.y*4 });
 
-  updateCamera(); updateSparks(dt);
+  updateHearts(dt, time); updateCamera(); updateSparks(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
