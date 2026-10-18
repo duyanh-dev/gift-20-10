@@ -875,7 +875,7 @@ function updateSparks(dt){
 /* ════════════════════════════════════════════════
    TRẠNG THÁI
    ════════════════════════════════════════════════ */
-const S = { mode:'wait', stage:0, u:0, uT:0, rise:0, shk:0, lidM:0, lidB:0, zoom:0 };
+const S = { mode:'wait', stage:0, u:0, uT:0, rise:0, shk:0, lidM:0, lidB:0, zoom:0, zi:0 };
 const rot = { yaw:0, pitch:.12, tYaw:0, tPitch:.12, vYaw:0, vPitch:0, drag:false, idle:0 };
 const par = { x:0, y:0, tx:0, ty:0 };
 const tilt = { x:0, y:0 };
@@ -905,9 +905,9 @@ function applyOpen(u){
 /* ── camera ──────────────────────────────────── */
 function updateCamera(){
   const e = smooth(S.u), r = S.rise;
-  const dist = lerp(D0, D1, e) * (1 - .1*r - .07*S.zoom);
+  const dist = lerp(D0, D1, e) * (1 - .1*r - .07*S.zoom - .2*S.zi);
   const pitch = lerp(.1, .66, e) - .12*r;
-  const ty = lerp(0, .5, e) + .1*r;
+  const ty = lerp(0, .5, e) + .1*r - .12*S.zi;
   camera.position.set(par.x*.32, ty + Math.sin(pitch)*dist - par.y*.2, Math.cos(pitch)*dist);
   camera.lookAt(par.x*.08, ty, 0);
 }
@@ -1288,6 +1288,7 @@ function finishUnfold(){
     const p = new THREE.Vector3(0,.2,0); cube.localToWorld(p); burst(p, 90, 2.6, 1.2); haptic(30);
   });
   gsap.to(S, { rise:1, duration:2.4, delay:.7, ease:'expo.out' });
+  gsap.to(S, { zi:1, duration:2, delay:1.4, ease:'power2.inOut' });
   gsap.delayedCall(2.8, () => { S.mode = 'items'; markPip(5); armHint(2600); });
 }
 
@@ -1381,7 +1382,7 @@ function openLetter(again){
     .to(dock, { autoAlpha:0, duration:.3 }, 0)
     .to(letterEl, { left:fx, top:fy, width:fw, height:fh, duration:1.25, ease:'expo.inOut' }, 0)
     .to(letterEl, { '--pa':.09, '--rad':'30px', duration:1, ease:'power2.inOut' }, .2)
-    .call(() => { if(!again){ dock.classList.remove('pips'); buildDots(CONFIG.pages.length); showPage(0,1); } }, null, .95)
+    .call(() => { if(!again){ dock.classList.remove('pips'); buildDots(CONFIG.pages.length); if(cur === 0) cur = -1; showPage(0,1); } }, null, .95)
     .to(dock, { autoAlpha:1, duration:.7 }, 1.1);
 }
 
@@ -1391,15 +1392,31 @@ function closeLetter(){
   haptic(8); Snd.click(1000,.3,2,.08); Snd.note(PENT[1], .08, 1.4);
   const r = letterRect(), fw = Math.min(W()*.88,500), fh = Math.min(H()*.7,620), fx = (W()-fw)/2, fy = (H()-fh)/2;
   gsap.set(letterEl, { margin:0, left:fx, top:fy, width:fw, height:fh, rotationX:0, rotationY:0 });
-  gsap.timeline({ onComplete:() => {
-      gsap.set(letterEl, { autoAlpha:0, clearProps:'left,top,width,height,margin' });
-      S.mode = 'items'; gsap.to(rl, { autoAlpha:1, duration:.5 });
-    } })
+  gsap.timeline({ onComplete:() => { S.mode = 'items'; ENVDONE = false; armHint(2500); } })
     .to(dock, { autoAlpha:0, duration:.25 }, 0)
     .to(letterEl, { left:r.x, top:r.y, width:r.w, height:r.h, duration:.9, ease:'expo.inOut' }, 0)
     .to(letterEl, { '--pa':.95, '--rad':'6px', duration:.7, ease:'power2.inOut' }, .1)
-    .call(() => { letter.visible = true; }, null, .85)
-    .to(letterEl, { autoAlpha:0, duration:.15 }, .85);
+    /* thư hiện lại ở chỗ vừa bay ra, phong bì nổi lên đón */
+    .call(() => {
+      letter.visible = true;
+      env.position.set(0,-.2,.4); env.rotation.set(Math.PI/2-.54,0,0); env.scale.setScalar(.01); flapHinge.rotation.x = -Math.PI;
+    }, null, .85)
+    .to(letterEl, { autoAlpha:0, duration:.15 }, .85)
+    .call(() => { gsap.set(letterEl, { clearProps:'left,top,width,height,margin' }); }, null, 1.1)
+    .to(env.position, { y:.45, duration:.7, ease:'power2.out' }, .9)
+    .to(env.scale, { x:1.7, y:1.7, z:1.7, duration:.7, ease:'power2.out' }, .9)
+    .call(() => { Snd.whoosh(.9,.14); Snd.note(PENT[2], .1, 1.6); }, null, 1.0)
+    /* thư bay ngược về, chui vào phong bì */
+    .to(LT, { e:0, duration:1.3, ease:'power3.inOut' }, 1.0)
+    .to(LT, { o:0, duration:.6, ease:'power2.in' }, 2.35)
+    .call(() => { Snd.click(1000,.3,2,.08); haptic(8); }, null, 2.9)
+    .call(() => { letter.visible = false; }, null, 2.95)
+    /* nắp đóng lại, phong bì về chỗ cũ trên đáy hộp */
+    .to(flapHinge.rotation, { x:0, duration:.7, ease:'power2.inOut' }, 2.95)
+    .call(() => { items.attach(env); Snd.whoosh(.7,.1); }, null, 3.65)
+    .to(env.position, { x:ENV.x, y:.006, z:ENV.z, duration:.9, ease:'power3.inOut' }, 3.65)
+    .to(env.rotation, { x:0, y:-.12, z:0, duration:.9, ease:'power3.inOut' }, 3.65)
+    .to(env.scale, { x:1, y:1, z:1, duration:.9, ease:'power3.inOut' }, 3.65);
 }
 ['pointerdown','pointerup'].forEach(t => xl.addEventListener(t, e => e.stopPropagation()));
 xl.addEventListener('click', closeLetter);
