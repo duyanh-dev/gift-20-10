@@ -3,20 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="theme-color" content="#0b0b0d">
+<meta name="theme-color" content="#1c1218">
 <title>Gửi em</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@200;300;400;500;600&family=Patrick+Hand&display=swap" rel="stylesheet">
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
   "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 }}
 </script>
-
 <link rel="stylesheet" href="./style.css">
-
 </head>
 <body>
 <canvas id="gl" tabindex="-1"></canvas>
@@ -27,7 +25,7 @@
   <svg class="off" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
 </button>
 
-<div id="hint" class="glass">Gợi ý · <b>ngày sinh của em và ngày sinh của anh</b><br><span style="opacity:.6">chỉ nhập ngày thôi nhé</span></div>
+<div id="hint" class="glass">Gợi ý · <b>ngày kỷ niệm</b> của chúng ta<br><span style="opacity:.6">gồm ngày và tháng</span></div>
 
 <section class="letter" id="letter"><div class="pages" id="pages"></div></section>
 
@@ -37,10 +35,11 @@
   <button class="btn" id="next" aria-label="Trang sau"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
   <button class="btn" id="redo" aria-label="Chơi lại"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4.2h4.2"/></svg></button>
 </nav>
+<div id="pv"><canvas id="pvc" width="432" height="688"></canvas></div>
 <div id="veil"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-
-<script type="module" src="./scrip.js"></script>
+<script src="./scrip.js" type="module">
+</script>
 </body>
 </html>
