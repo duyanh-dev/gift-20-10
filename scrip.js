@@ -873,8 +873,8 @@ const CAN_REST = new THREE.Vector3(.72,.15,.52), CAN_POUR = new THREE.Vector3(.5
 
 /* ── kéo bình nước bằng tay: các ngưỡng (đơn vị toạ độ vườn) ── */
 const CAN_H = .8;        /* độ cao bình khi đang cầm */
-const CAN_EDGE = .74;    /* thả tay ngoài mép này → bình rơi khỏi hộp */
-const CAN_LIM = 1.2;     /* kéo xa quá mức này → bình tuột khỏi tay */
+const CAN_EDGE = .9;     /* thả tay ngoài mép này → bình rơi khỏi hộp */
+const CAN_LIM = 1.5;     /* kéo xa quá mức này → bình tuột khỏi tay */
 const POUR_MIN = .38;    /* vùng tưới: khoảng cách gần nhất tới cây */
 const POUR_MAX = .8;     /* vùng tưới: khoảng cách xa nhất tới cây */
 const POT_R = .3;        /* vòi phải nằm trong bán kính này mới tính là nước vào chậu */
@@ -930,20 +930,24 @@ function canPoint(x, y){
 }
 
 /* bắt đầu cầm bình: nhấc lên từ vị trí hiện tại */
+/* bắt đầu cầm bình: nhấc lên từ vị trí hiện tại, nhớ độ lệch giữa ngón tay và bình để bình không bị nhảy */
 function grabCan(x, y){
   if(GR.lost || GR.done){ P.kind = 'none'; return; }   /* đang rơi / đã xong thì không cầm được */
   GR.held = true; GR.cp.copy(can.position); GR.dp.copy(can.position);
-  const q = canPoint(x, y); if(q) GR.dp.copy(q);
+  GR.off = { x:0, z:0 };
+  const q = canPoint(x, y);
+  if(q){ GR.off.x = can.position.x - q.x; GR.off.z = can.position.z - q.z; }   /* độ lệch lúc nắm */
+  GR.dp.y = CAN_H;                                                              /* bình được nhấc lên độ cao cầm */
   if(!GR.tipHid){ GR.tipHid = true; gsap.to(hintEl, { autoAlpha:0, duration:.4 }); }
   haptic(8); Snd.click(1400,.25,3,.05);
 }
 
-/* ngón tay di chuyển: cập nhật đích; kéo quá xa thì bình tuột khỏi tay */
+/* ngón tay di chuyển: đích = điểm chiếu + độ lệch; kéo quá xa thì bình tuột khỏi tay */
 function dragCan(x, y){
   if(!GR.held) return;
   const q = canPoint(x, y); if(!q) return;
-  GR.dp.copy(q);
-  if(Math.max(Math.abs(q.x), Math.abs(q.z)) > CAN_LIM) loseCan();
+  GR.dp.set(q.x + GR.off.x, CAN_H, q.z + GR.off.z);
+  if(Math.max(Math.abs(GR.dp.x), Math.abs(GR.dp.z)) > CAN_LIM) loseCan();
 }
 
 /* nhả tay: ngoài mép hộp thì rơi, trên sàn thì đặt xuống chỗ đó */
