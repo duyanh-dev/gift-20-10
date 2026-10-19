@@ -29,7 +29,7 @@ const CONFIG = {
     enabled: true,                
     src: './music/Trying My Best.mp3',     
     startAt: 0,                  
-    volume: 0.7,                 
+    volume: 0.50,                 
     synthAfterOpen: true           
   },
 };
