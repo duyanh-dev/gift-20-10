@@ -23,7 +23,15 @@ const CONFIG = {
     { src:'./images/anni_1.jpg', caption:'Kỷ niệm 1' },
     { src:'./images/anni_2.jpg', caption:'Kỷ niệm 2' },
     { src:'./images/anni_3.jpg', caption:'Kỷ niệm 3' }
-  ]
+  ],
+    /* nhạc nền mp3: phát sau khi hộp đã bung ra (trước đó vẫn là âm thanh tổng hợp) */
+  music: {
+    enabled: true,                
+    src: './music/Trying My Best.mp3',     
+    startAt: 0,                  
+    volume: 0.7,                 
+    synthAfterOpen: true           
+  },
 };
 
 /* ── helpers ─────────────────────────────────── */
@@ -41,11 +49,11 @@ const BOT = -Math.PI/2;   /* góc nghiêng để lật mặt đáy hướng về
    ÂM THANH — tổng hợp bằng WebAudio, không cần file
    ════════════════════════════════════════════════ */
 const Snd = (() => {
-  let ctx=null, master=null, noise=null, wet=null, muted=false;
+    let ctx=null, master=null, noise=null, wet=null, muted=false, fxOff=false;
   const init = () => {
     if(!ctx){
       const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return;
-      ctx = new AC(); master = ctx.createGain(); master.gain.value = muted ? 0 : .6; master.connect(ctx.destination);
+      ctx = new AC(); master = ctx.createGain(); master.gain.value = (muted || fxOff) ? 0 : .6; master.connect(ctx.destination);
       const dl = ctx.createDelay(1); dl.delayTime.value = .27;
       const fb = ctx.createGain(); fb.gain.value = .32; const wg = ctx.createGain(); wg.gain.value = .26;
       wet = ctx.createGain(); wet.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wg); wg.connect(master);
@@ -61,7 +69,10 @@ const Snd = (() => {
   return {
     init,
     get muted(){ return muted; },
-    setMuted(m){ muted = m; if(master) master.gain.value = m ? 0 : .6; },
+        /* bật/tắt toàn bộ âm thanh tổng hợp */
+    setMuted(m){ muted = m; if(master) master.gain.value = (m || fxOff) ? 0 : .6; },
+    /* tắt riêng hiệu ứng tổng hợp (dùng khi chỉ muốn nghe mp3) */
+    setFxOff(f){ fxOff = f; if(master) master.gain.value = (muted || f) ? 0 : .6; },
     click(f=2400, g=.2, q=5, dur=.045){
       if(!ctx) return; const t = ctx.currentTime;
       const s = ctx.createBufferSource(); s.buffer = noise;
@@ -122,6 +133,32 @@ const Snd = (() => {
   };
 })();
 const chord = (idx, base=0) => idx.forEach((k,i) => Snd.note(PENT[k]*(base?base:1), .13, 2.2, i*.09));
+
+/* ════════════════════════════════════════════════
+   NHẠC NỀN MP3 — phát sau khi hộp bung ra
+   startAt (phút) lấy từ CONFIG.music, hết bài thì quay lại đúng mốc đó
+   ════════════════════════════════════════════════ */
+const Music = (() => {
+  const cfg = CONFIG.music || {};
+  let a = null, muted = false, started = false;
+  const fade = { v:0 };
+  const vol = () => muted ? 0 : (cfg.volume ?? .6);
+  /* tua tới phút bắt đầu */
+  const seek = () => { try { a.currentTime = Math.max(0, (cfg.startAt || 0) * 60); } catch(e){} };
+  return {
+    /* bắt đầu phát (gọi trong lúc người dùng đang chạm để trình duyệt cho phép) */
+    start(){
+      if(started || !cfg.enabled || !cfg.src) return; started = true;
+      a = new Audio(cfg.src); a.preload = 'auto'; a.volume = 0;
+      a.addEventListener('loadedmetadata', seek, { once:true });
+      a.addEventListener('ended', () => { seek(); a.play().catch(() => {}); });   /* lặp lại từ mốc startAt */
+      a.play().catch(() => {});
+      gsap.to(fade, { v:1, duration:2.5, onUpdate:() => { a.volume = clamp(0,1, vol()*fade.v); } });
+    },
+    /* bật/tắt tiếng cùng nút loa */
+    setMuted(m){ muted = m; if(a) a.volume = clamp(0,1, vol()*fade.v); }
+  };
+})();
 
 /* ════════════════════════════════════════════════
    THREE — renderer, scene
@@ -1194,8 +1231,10 @@ function pick(x, y){
    GỢI Ý BẰNG BÓNG TAY (không chữ)
    ════════════════════════════════════════════════ */
 const ghost = $('#ghost'), swipe = $('#swipe'); let ghostTl = null, hintTimer = 0;
-const showSwipe = () => gsap.to(swipe, { autoAlpha:1, duration:.7, delay:.3 });
-const hideSwipe = () => gsap.to(swipe, { autoAlpha:0, duration:.25 });
+/* hiện gợi ý vuốt (huỷ tween cũ để không chồng nhau) */
+const showSwipe = () => { gsap.killTweensOf(swipe); gsap.to(swipe, { autoAlpha:1, duration:.7, delay:.3 }); };
+/* ẩn gợi ý vuốt và huỷ mọi tween đang chờ hiện lại */
+const hideSwipe = () => { gsap.killTweensOf(swipe); gsap.to(swipe, { autoAlpha:0, duration:.25 }); };
 function hideGhost(){ if(ghostTl){ ghostTl.kill(); ghostTl = null; } gsap.killTweensOf(ghost); gsap.to(ghost,{ opacity:0, scale:1, duration:.2 }); }
 function armHint(ms=4500){ clearTimeout(hintTimer); hintTimer = setTimeout(playHint, ms); }
 function playHint(){
@@ -1548,6 +1587,8 @@ function mechOpen(){
    BƯỚC 6 — kéo hộp bung ra (ảnh + phong bì hiện trên đáy hộp)
    ════════════════════════════════════════════════ */
 function finishUnfold(){
+    Music.start();                                              /* hộp đã mở → vào nhạc mp3 */
+  if(CONFIG.music && CONFIG.music.enabled && !CONFIG.music.synthAfterOpen) Snd.setFxOff(true);
   S.mode = 'rise'; hideGhost(); hideSwipe(); clearTimeout(hintTimer);
   Snd.whoosh(1.4,.26); haptic([20,40,30]);
   gsap.to(S, { u:1, duration:1, ease:'power3.out' });
@@ -1822,7 +1863,7 @@ const release = e => {
     if(S.uT > .55) finishUnfold();
     else {
       gsap.to(S, { u:0, uT:0, duration:1, ease:'elastic.out(1,.55)' });
-      gsap.to(swipe, { autoAlpha:1, duration:.6, delay:1 });
+            gsap.delayedCall(1, () => { if(S.mode === 'unfold') showSwipe(); });   /* chỉ hiện lại nếu hộp chưa mở */
       if(tap){ Snd.click(800,.25,2,.08); haptic(8); gsap.fromTo(S,{ u:.0 },{ u:.12, duration:.22, yoyo:true, repeat:1, ease:'power2.out', overwrite:true }); }
     }
   } else if(k === 'lift'){ if(tap) { P = null; openLetter(); return; } }
@@ -1859,7 +1900,11 @@ addEventListener('touchend', () => Snd.init(), { passive:true });
 addEventListener('click', () => Snd.init());
 
 const snd = $('#snd');
-snd.addEventListener('click', () => { Snd.init(); Snd.setMuted(!Snd.muted); snd.classList.toggle('muted', Snd.muted); });
+/* nút loa: tắt/bật cả âm tổng hợp lẫn mp3 */
+snd.addEventListener('click', () => {
+  Snd.init(); Snd.setMuted(!Snd.muted); Music.setMuted(Snd.muted);
+  snd.classList.toggle('muted', Snd.muted);
+});
 
 /* ════════════════════════════════════════════════
    VÒNG LẶP
