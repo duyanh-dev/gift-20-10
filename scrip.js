@@ -870,7 +870,20 @@ const setCord = v => { tie.visible = cord.visible = !!v; };
 const can = new THREE.Group(); garden.add(can);
 const canTip = new THREE.Object3D(); canTip.position.set(-.395,.152,0); can.add(canTip);
 const CAN_REST = new THREE.Vector3(.72,.15,.52), CAN_POUR = new THREE.Vector3(.55,.8,.08);
-can.position.copy(CAN_REST); can.scale.setScalar(1.15);
+
+/* ── kéo bình nước bằng tay: các ngưỡng (đơn vị toạ độ vườn) ── */
+const CAN_H = .8;        /* độ cao bình khi đang cầm */
+const CAN_EDGE = .74;    /* thả tay ngoài mép này → bình rơi khỏi hộp */
+const CAN_LIM = 1.2;     /* kéo xa quá mức này → bình tuột khỏi tay */
+const POUR_MIN = .38;    /* vùng tưới: khoảng cách gần nhất tới cây */
+const POUR_MAX = .8;     /* vùng tưới: khoảng cách xa nhất tới cây */
+const POT_R = .3;        /* vòi phải nằm trong bán kính này mới tính là nước vào chậu */
+const POT_OUT = .55;     /* bình đặt xuống sàn không được chui vào chậu */
+/* trạng thái kéo bình: cp = vị trí hiện tại, dp = vị trí đích theo ngón tay, home = chỗ bình nghỉ */
+Object.assign(GR, { held:false, lost:false, hw:0, ry:0, cp:CAN_REST.clone(), dp:CAN_REST.clone(), home:CAN_REST.clone() });
+/* điểm neo chỉ để gợi ý bóng tay biết đưa bình tới đâu */
+const pourAnchor = new THREE.Object3D(); pourAnchor.position.copy(CAN_POUR); garden.add(pourAnchor);
+
 {
   can.add(new THREE.Mesh(new THREE.CylinderGeometry(.14,.16,.22,32), GM.can));
   const rim = new THREE.Mesh(new THREE.TorusGeometry(.14,.013,10,36), GM.canD); rim.rotation.x = Math.PI/2; rim.position.y = .11; can.add(rim);
@@ -904,6 +917,60 @@ function spawnDrop(x,y,z,vx,vy,vz,kind){
 /* tất cả vật trang trí không cản tia chọn (chỉ các hit-mesh mới nhận chạm) */
 garden.traverse(o => { if(!o.userData.hit) o.raycast = () => {}; });
 
+const _pl = new THREE.Plane(), _pn = new THREE.Vector3(), _pp = new THREE.Vector3(), _ph = new THREE.Vector3();
+
+/* đổi toạ độ màn hình → điểm trong toạ độ vườn, trên mặt phẳng ngang ở độ cao CAN_H */
+function canPoint(x, y){
+  garden.updateWorldMatrix(true, false);
+  _pn.set(0,1,0).transformDirection(garden.matrixWorld);
+  _pp.set(0, CAN_H, 0); garden.localToWorld(_pp);
+  _pl.setFromNormalAndCoplanarPoint(_pn, _pp);
+  ndc.set(x/W()*2-1, -(y/H())*2+1); ray.setFromCamera(ndc, camera);
+  return ray.ray.intersectPlane(_pl, _ph) ? garden.worldToLocal(_ph.clone()) : null;
+}
+
+/* bắt đầu cầm bình: nhấc lên từ vị trí hiện tại */
+function grabCan(x, y){
+  if(GR.lost || GR.done){ P.kind = 'none'; return; }   /* đang rơi / đã xong thì không cầm được */
+  GR.held = true; GR.cp.copy(can.position); GR.dp.copy(can.position);
+  const q = canPoint(x, y); if(q) GR.dp.copy(q);
+  if(!GR.tipHid){ GR.tipHid = true; gsap.to(hintEl, { autoAlpha:0, duration:.4 }); }
+  haptic(8); Snd.click(1400,.25,3,.05);
+}
+
+/* ngón tay di chuyển: cập nhật đích; kéo quá xa thì bình tuột khỏi tay */
+function dragCan(x, y){
+  if(!GR.held) return;
+  const q = canPoint(x, y); if(!q) return;
+  GR.dp.copy(q);
+  if(Math.max(Math.abs(q.x), Math.abs(q.z)) > CAN_LIM) loseCan();
+}
+
+/* nhả tay: ngoài mép hộp thì rơi, trên sàn thì đặt xuống chỗ đó */
+function dropCan(){
+  if(!GR.held) return;
+  GR.held = false;
+  if(Math.max(Math.abs(GR.dp.x), Math.abs(GR.dp.z)) > CAN_EDGE){ loseCan(); return; }
+  let x = GR.dp.x, z = GR.dp.z; const d = Math.hypot(x, z);
+  if(d < POT_OUT){ x = d > .001 ? x/d*POT_OUT : POT_OUT; z = d > .001 ? z/d*POT_OUT : 0; }   /* đẩy ra khỏi chậu */
+  GR.home.set(x, CAN_REST.y, z);
+  Snd.click(700,.3,2,.08); haptic(8);
+}
+
+/* bình rơi khỏi hộp, rồi xuất hiện lại ở chỗ ban đầu (nảy xuống) */
+function loseCan(){
+  if(GR.lost) return;
+  GR.held = false; GR.lost = true; if(P) P.kind = 'none';
+  haptic([20,40,20]); Snd.whoosh(.6,.1);
+  gsap.killTweensOf(GR.cp);
+  gsap.to(GR.cp, { x:GR.cp.x*1.25, z:GR.cp.z*1.25, y:-2.6, duration:.8, ease:'power2.in', onComplete:() => {
+    GR.home.copy(CAN_REST);
+    GR.cp.set(CAN_REST.x, 1.7, CAN_REST.z);
+    Snd.note(PENT[2], .1, 1.4);
+    gsap.to(GR.cp, { y:CAN_REST.y, duration:1, ease:'bounce.out', onComplete:() => { GR.lost = false; Snd.click(900,.3,2,.08); } });
+  } });
+}
+
 /* ════════════════════════════════════════════════
    LOGIC TƯỚI CÂY
    ════════════════════════════════════════════════ */
@@ -913,7 +980,7 @@ function introSprout(){
   GR.sf = GR.sT = .02; updateStem(GR.sf);
   gsap.to(GR, { sT:.2, duration:1.2, ease:'power2.out', onComplete:() => {
     GR.on = true;
-    hintEl.innerHTML = 'Chạm giữ <b>bình nước</b> để tưới cây'; gsap.to(hintEl, { autoAlpha:1, duration:.8 });
+        hintEl.innerHTML = 'Kéo <b>bình nước</b> lại gần cây để tưới'; gsap.to(hintEl, { autoAlpha:1, duration:.8 });
   } });
   Snd.note(PENT[1], .1, 1.8); Snd.click(1800,.25,3,.06); haptic(8);
   burst(plant.localToWorld(new THREE.Vector3(0,.15,0)), 26, 1, .6);
@@ -963,22 +1030,50 @@ function growFlower(){
 }
 
 function updateGarden(dt, time){
-  const pouring = S.mode === 'items' && GR.on && P && P.kind === 'water' && !GR.busy && !GR.done;
+  /* 0 — thả bình nếu ngón tay đã nhả hoặc đã rời chế độ items */
+  if(GR.done) GR.held = false;
+  if(GR.held && !(S.mode === 'items' && P && P.kind === 'can')) dropCan();
+
+  /* 1 — bình bám theo ngón tay; hw = mức "đang cầm" (0 → 1) để chuyển mượt */
+  if(GR.held) GR.cp.lerp(GR.dp, 1 - Math.exp(-dt*14));
+  GR.hw += ((GR.held || GR.lost ? 1 : 0) - GR.hw) * (1 - Math.exp(-dt*(GR.held ? 16 : 6)));
+  const dH = Math.hypot(GR.cp.x, GR.cp.z);                       /* khoảng cách bình – cây */
+  const inZone = GR.held && dH >= POUR_MIN && dH <= POUR_MAX;    /* đang trong vùng tưới */
+
+  /* tưới khi: giữ vào cây (kiểu cũ) HOẶC cầm bình trong vùng tưới */
+  const pouring = S.mode === 'items' && GR.on && !GR.busy && !GR.done && ((P && P.kind === 'water') || inZone);
   GR.can += ((pouring ? 1 : 0) - GR.can) * (1 - Math.exp(-dt*(pouring ? 4.2 : 3)));
   const c = GR.can, e = smooth(c), tl = smooth((c-.3)/.7);
+
+  /* vị trí gốc (kiểu cũ, nhưng xuất phát từ home) trộn với vị trí đang cầm */
+  const bx = lerp(GR.home.x, CAN_POUR.x, e),
+        by = lerp(GR.home.y, CAN_POUR.y, e) + Math.sin(Math.PI*Math.min(1,c))*.12 + Math.sin(time*2)*.008*(1-c),
+        bz = lerp(GR.home.z, CAN_POUR.z, e);
   can.position.set(
-    lerp(CAN_REST.x, CAN_POUR.x, e),
-    lerp(CAN_REST.y, CAN_POUR.y, e) + Math.sin(Math.PI*Math.min(1,c))*.12 + Math.sin(time*2)*.008*(1-c),
-    lerp(CAN_REST.z, CAN_POUR.z, e));
+    lerp(bx, GR.cp.x, GR.hw),
+    lerp(by, GR.cp.y, GR.hw) + Math.sin(time*3)*.01*GR.hw*(1-c),
+    lerp(bz, GR.cp.z, GR.hw));
+
+  /* vòi luôn hướng về phía cây khi đang cầm; thả ra thì quay lại mặt về người xem */
+  const tgt = GR.held ? (dH > .05 ? Math.atan2(-GR.cp.z, GR.cp.x) : GR.ry) : 0;
+  let dr = tgt - GR.ry; dr -= Math.PI*2*Math.round(dr/(Math.PI*2));
+  GR.ry += dr*(1 - Math.exp(-dt*8));
+  can.rotation.y = GR.ry;
   can.rotation.z = .72*tl + (pouring && c > .8 ? Math.sin(time*28)*.012 : 0);
-  canBlob.material.opacity = 1 - c;
+
+  /* bóng đổ dưới bình: đi theo bình, mờ dần khi bình nhấc lên hoặc rơi */
+  const lift = clamp(0,1,(can.position.y-.15)/.7), under = clamp(0,1,(can.position.y+.1)/.25);
+  canBlob.position.set(can.position.x + .02, .005, can.position.z);
+  canBlob.material.opacity = (1 - c) * (1 - lift) * under;
 
   if(pouring && c > .8){
     if(!GR.tipHid){ GR.tipHid = true; gsap.to(hintEl, { autoAlpha:0, duration:.4 }); }
-    GR.w = Math.min(WTH[GR.stage], GR.w + dt*POUR_RATE);
-    GR.emit += dt*80;
     can.updateMatrixWorld(true); canTip.getWorldPosition(_ta); garden.worldToLocal(_ta);
-    while(GR.emit >= 1){ GR.emit -= 1; spawnDrop(_ta.x + (Math.random()-.5)*.025, _ta.y, _ta.z + (Math.random()-.5)*.025, -.32 - Math.random()*.12, -.15, (Math.random()-.5)*.06, 0); }
+    /* chỉ tính nước khi vòi nằm trên chậu (tưới trượt ra ngoài thì không lớn) */
+    if(Math.hypot(_ta.x, _ta.z) < POT_R) GR.w = Math.min(WTH[GR.stage], GR.w + dt*POUR_RATE);
+    GR.emit += dt*80;
+    const sx = -Math.cos(can.rotation.y), sz = Math.sin(can.rotation.y);   /* hướng vòi trong toạ độ vườn */
+    while(GR.emit >= 1){ GR.emit -= 1; const v = .32 + Math.random()*.12; spawnDrop(_ta.x + (Math.random()-.5)*.025, _ta.y, _ta.z + (Math.random()-.5)*.025, sx*v, -.15, sz*v + (Math.random()-.5)*.06, 0); }
     GR.snd -= dt; if(GR.snd <= 0){ GR.snd = .07 + Math.random()*.05; Snd.click(2600 + Math.random()*2200, .05, 2.5, .035); }
     GR.wig = Math.min(1, GR.wig + dt*3);
     if(GR.w >= WTH[GR.stage] - 1e-6) growStage(GR.stage);
@@ -1276,10 +1371,12 @@ function playHint(){
     } else if(S.mode === 'items'){
     const c = toScreen(GR.done ? env : can);
     if(!GR.done){
-      tl.call(() => at(c.x,c.y))
+      const b = toScreen(pourAnchor);   /* bóng tay kéo bình từ chỗ nghỉ tới chỗ tưới */
+      tl.call(() => { const q = toScreen(can); at(q.x, q.y); })
         .to(ghost,{ opacity:1, duration:.25 })
         .to(ghost,{ scale:.8, duration:.2 })
-        .to(ghost,{ scale:.8, duration:1.8 })
+        .to(ghost,{ x:b.x, y:b.y, duration:1.3, ease:'power2.inOut' })
+        .to(ghost,{ scale:.8, duration:1.2 })
         .to(ghost,{ opacity:0, scale:1, duration:.3 });
     } else {
       tl.call(() => at(c.x,c.y))
@@ -1825,7 +1922,10 @@ canvas.addEventListener('pointerdown', e => {
   else if(S.mode === 'items'){
     if(hit && hit.kind === 'photo'){ P.kind = 'none'; showPhoto(hit.idx); }
       else if(hit && hit.kind === 'env' && GR.done){ P.kind = 'none'; openEnvelope(); }
-    else if(hit && hit.kind === 'water' && !GR.done){ P.kind = 'water'; haptic(6); }
+        else if(hit && hit.kind === 'water' && !GR.done){
+      if(hit.obj === waterHit){ P.kind = 'water'; haptic(6); }      /* chạm vào cây: tưới kiểu cũ */
+      else { P.kind = 'can'; grabCan(e.clientX, e.clientY); }       /* chạm vào bình: cầm và kéo */
+    }
     else { P.kind = 'rot'; startRot(e); }
   }
   else if(S.mode === 'letter'){ if(hit && hit.kind === 'letter') P.kind = 'lift'; else { P.kind = 'rot'; startRot(e); } }
@@ -1849,7 +1949,10 @@ canvas.addEventListener('pointermove', e => {
     const d = Math.hypot(e.clientX-P.x0, e.clientY-P.y0); S.uT = clamp(0,1,d/(Math.min(W(),H())*.42));
   } else if(P.kind === 'lift'){
     const dy = e.clientY-P.y0; P.lift = clamp(0,1,-dy/120); if(dy < -55){ P.kind = 'none'; P = null; openLetter(); return; }
-  } else if(P.kind === 'rot'){ moveRot(e); }
+    } else if(P.kind === 'can'){
+    dragCan(e.clientX, e.clientY);
+  }  
+  else if(P.kind === 'rot'){ moveRot(e); }
 });
 const release = e => {
   Snd.init();
@@ -1859,6 +1962,7 @@ const release = e => {
   else if(k === 'dial') MECH.dial.held = false;
   else if(k === 'slider') MECH.slider.held = false;
   else if(k === 'orb') MECH.orb.hold = false;
+    else if(k === 'can') dropCan();
   else if(k === 'pull'){
     if(S.uT > .55) finishUnfold();
     else {
