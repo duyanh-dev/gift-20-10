@@ -27,7 +27,7 @@ const CONFIG = {
     /* nhạc nền mp3: phát sau khi hộp đã bung ra (trước đó vẫn là âm thanh tổng hợp) */
   music: {
     enabled: true,                
-    src: './music/Trying My Best.mp3',     
+    src: './music/TryingMyBest.mp3',     
     startAt: 50/60,          
     volume: 0.7,                 
     synthAfterOpen: true           
