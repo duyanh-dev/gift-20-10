@@ -28,8 +28,8 @@ const CONFIG = {
   music: {
     enabled: true,                
     src: './music/Trying My Best.mp3',     
-    startAt: 0,                  
-    volume: 0.50,                 
+    startAt: 0.50,                  
+    volume: 0.7,                 
     synthAfterOpen: true           
   },
 };
