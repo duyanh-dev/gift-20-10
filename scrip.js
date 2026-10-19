@@ -11,18 +11,18 @@ const CONFIG = {
   pages: [
     { title: 'Dear empe,', text: 'Kaka đầu tiên thì anh chúc cho iu của anh 20/10 thật xinh đẹp nhó, mặc dù lúc nào em cũng xinh đẹp nhất với anh, anh chúc iu lúc nào cũng xinh đẹp nhất, vui vẻ nhất, hạnh phúc nhất nhen,' },
     { text: 'Chúc mừng 20/10 của em và chúc mừng anni 2 năm 3 tháng của chúng mình nhó. Babi chịu thiệt nhiều rùi, anh thương bé lắm, chúng mình cùng cố gắng nhen.' },
-    { text: 'Kaka 2 năm 3 tháng đi với nhau rồi nhỉ, vui có buồn có, nhưng mà chún mìn vẫn có nheo 3 nhỉ. Đây này kaka mãi đến giờ mới code cho người iu nhỉ, anh tệ ha cục vành, cơ mà anh thương babi lắm,' },
+    { text: 'Kaka 2 năm 3 tháng đi với nhau rồi nhỉ, vui có buồn có, nhưng mà chún mìn vẫn có nheo iu nhỉ. Đây này kaka mãi đến giờ mới code cho người iu nhỉ, anh tệ ha cục vàng, cơ mà anh thương babi lắm,' },
     { text: 'anh thấy em thích nhiều thứ mà anh chưa mua cho babi được, thui thì bé cố gắng thời gian này nhó, anh sẽ mang tiền về cho chún mình, tin anh kaka.' },
-    { text: 'Anh tặng babi trước thùng quà tình iu tự tai anh làm ra nhó, anh sẽ tặng cho babi nhìu hơn nữaa. Anh thương babi lắmm, anh iu emm. Chúc mừng anni chúng ta và chúc cho em 20/10 thật đặc biệt nhó.' },
+    { text: 'Anh tặng babi trước thùng quà tình iu tự tay anh làm ra nhó, anh sẽ tặng cho babi nhìu hơn nữaa. Anh thương babi lắmm, anh iu emm. Chúc mừng anni chúng ta và chúc cho em 20/10 thật đặc biệt nhó.' },
     { text: 'I’m trying my best. I’m trying my best to be okay. I’m trying my best, but every day it’s so hard. But through it all, I’m lucky to have you.', sign: 'Iu của em, Duy Anh' }
   ],
   /* mật mã mặt đáy (ngày + tháng kỷ niệm) */
   code: '2007',
   /* 3 ảnh instax: điền đường dẫn ảnh vào src (để trống = ảnh mẫu) */
   photos: [
-    { src:'./images/anni_1.jpg', caption:'Kỷ niệm 1' },
-    { src:'./images/anni_2.jpg', caption:'Kỷ niệm 2' },
-    { src:'./images/anni_3.jpg', caption:'Kỷ niệm 3' }
+    { src:'./images/anni_1.jpg', caption:'photobooth đầu tiên' },
+    { src:'./images/anni_2.jpg', caption:'luv uuuu' },
+    { src:'./images/anni_3.jpg', caption:'my favv keke:)' }
   ],
     /* nhạc nền mp3: phát sau khi hộp đã bung ra (trước đó vẫn là âm thanh tổng hợp) */
   music: {
