@@ -694,8 +694,15 @@ const GM = {
   disc : new THREE.MeshStandardMaterial({ color:0xf0b240, roughness:.8 }),
   seed : new THREE.MeshStandardMaterial({ color:0xffffff, roughness:.8 }),
   calyx: new THREE.MeshStandardMaterial({ color:0x79ab5c, roughness:.75 }),
-  cot  : leafMat(0xeaffd2)
+    cot  : leafMat(0x74c24f)
 };
+
+
+GM.cot.emissive.setHex(0x1f5a1c);
+GM.cot.emissiveIntensity = .05;
+GM.cot.envMapIntensity = .45;
+GM.cot.roughness = .85;
+GM.cot.bumpScale = 1.4;
 
 /* geometry lá / cánh: lưới cong, gập dọc gân giữa, đầu rủ xuống */
 const leafShape  = v => Math.pow(Math.sin(Math.PI*Math.pow(v,.72)),.85)*(1-.22*v);
@@ -750,15 +757,16 @@ const stemMesh = new THREE.Mesh(stemGeo, new THREE.MeshStandardMaterial({ vertex
 stemMesh.frustumCulled = false; plant.add(stemMesh);
 const cA = new THREE.Color(0x7aa356), cB = new THREE.Color(0xb3da86);
 
-/* búp non ở đỉnh thân (2 lá bé khép) */
+/* búp non ở đỉnh thân: 2 lá mầm xòe ra hai bên (như cây con thật) + một nụ nhỏ ở giữa.
+   lá to hơn, mở rộng (rotation.x ~.85) thay vì khép lại như trước */
 const bud = new THREE.Group(); plant.add(bud);
 [0,Math.PI].forEach(a => {
-  const g = new THREE.Group(); g.rotation.y = a; bud.add(g);
-  const t = new THREE.Group(); t.rotation.x = .38; g.add(t);
-  t.add(new THREE.Mesh(bladeGeo(.1,.04,.3,.1,4,8,roundShape), GM.cot));
+  const g = new THREE.Group(); g.rotation.y = a + .35; bud.add(g);
+  const t = new THREE.Group(); t.rotation.x = .85; g.add(t);
+  const m = new THREE.Mesh(bladeGeo(.15,.065,.3,.15,6,10,roundShape), GM.cot); m.position.y = .004; t.add(m);
 });
-{ const core = new THREE.Mesh(new THREE.SphereGeometry(.026,12,10), GM.cot); core.scale.y = 1.6; core.position.y = .02; bud.add(core); }
-
+/* nụ giữa 2 lá: nhỏ và tròn, không kéo dài */
+{ const core = new THREE.Mesh(new THREE.SphereGeometry(.016,12,10), GM.cot); core.scale.y = 1.2; core.position.y = .012; bud.add(core); }
 function updateStem(f){
   f = Math.max(.004, f);
   for(let i=0;i<=STEM_N;i++){
@@ -766,8 +774,8 @@ function updateStem(f){
     stemCurve.getPointAt(t, _sp); stemCurve.getTangentAt(t, _st);
     _sn.set(_st.y, -_st.x, 0); if(_sn.lengthSq() < 1e-6) _sn.set(1,0,0); _sn.normalize();
     _sb.crossVectors(_st, _sn).normalize();
-    let r = .05 - .027*t; const e = Math.max(0,(k-.88)/.12); r *= Math.sqrt(1 - e*e*.92);
-    _sc.copy(cA).lerp(cB, Math.min(1, t*1.25));
+    let r = lerp(.022, .05, clamp(0,1,(f-.2)/.8)) - .027*t;
+    const e = Math.max(0,(k-.88)/.12); r *= 1 - e*.35;    _sc.copy(cA).lerp(cB, Math.min(1, t*1.25));
     for(let j=0;j<=STEM_R;j++){
       const a = j/STEM_R*Math.PI*2, ca = Math.cos(a), sa = Math.sin(a), q = (i*(STEM_R+1)+j)*3;
       const nx = _sn.x*ca + _sb.x*sa, ny = _sn.y*ca + _sb.y*sa, nz = _sn.z*ca + _sb.z*sa;
